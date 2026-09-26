@@ -14,11 +14,11 @@
   const CONFIG = {
     // Google Apps Script Web App Deployment URL (Two-Way Sync)
     GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwh-PvW0UNXCz99CbzZJx9QJxhwL-M13P0fDn_55NTT_r942YryR6OuGhdmZiKlcVW_/exec',
-
+    
     // Google Sheet & Drive Source IDs (Master Reference)
     SHEET_MASTER_ID: '167gvGXW7EeK4fdKJED1TKhqRiMJmFkte5-sH3Ybigk8',
     DRIVE_FOLDER_ID: '1kb08cT4u-vMIEA0de7eFcowlI-wiPqNE',
-
+    
     // LocalStorage Cache Keys for Instant 0-second loading
     STORAGE_KEY_USER: 'HQD_CURRENT_USER_V1',
     STORAGE_KEY_DATA: 'HQD_APP_DATA_V2',
@@ -340,6 +340,37 @@
     return state.readDocIds && state.readDocIds.has(docId);
   };
 
+  const saveLocalDocFile = (docId, fileBase64) => {
+    if (!docId || !fileBase64) return;
+    try {
+      const files = JSON.parse(localStorage.getItem('HQD_DOC_FILES_V1') || '{}');
+      files[docId] = fileBase64;
+      localStorage.setItem('HQD_DOC_FILES_V1', JSON.stringify(files));
+    } catch (e) {
+      console.warn('saveLocalDocFile error:', e);
+    }
+  };
+
+  const getLocalDocFile = (docId) => {
+    if (!docId) return '';
+    try {
+      const files = JSON.parse(localStorage.getItem('HQD_DOC_FILES_V1') || '{}');
+      return files[docId] || '';
+    } catch {
+      return '';
+    }
+  };
+
+  const toEmbeddableDriveUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+    }
+    return url;
+  };
+
   const syncCurrentUserWithList = () => {
     if (!state.currentUser) return;
     const currentInList = state.users.find(u => u.id === state.currentUser.id);
@@ -383,7 +414,7 @@
       try {
         localStorage.removeItem('HQD_APP_DATA_V1');
         localStorage.removeItem('HQD_READ_DOCS_V1');
-      } catch (_) { }
+      } catch (_) {}
 
       // 1. Load active user session
       const savedUser = localStorage.getItem(CONFIG.STORAGE_KEY_USER);
@@ -500,9 +531,9 @@
                 const targetAud = String(d.targetAudience || d.targetType || 'all').trim();
                 const isAll = targetAud.toLowerCase() === 'all';
                 const targetUsers = Array.isArray(d.targetUsers) && d.targetUsers.length > 0
-                  ? d.targetUsers
+                  ? d.targetUsers 
                   : (isAll ? state.users.map(u => u.id) : targetAud.split(',').map(s => s.trim()).filter(Boolean));
-
+                
                 let ackUsers = [];
                 if (Array.isArray(d.acknowledgedUsers)) ackUsers = d.acknowledgedUsers;
                 else if (Array.isArray(d.readStatus)) ackUsers = d.readStatus;
@@ -515,6 +546,11 @@
                 if (linkMatch && !fileUrl) {
                   fileUrl = linkMatch[1];
                   cleanTitle = cleanTitle.replace(/\s*\((https?:\/\/[^)]+)\)/, '').trim();
+                }
+
+                const docId = String(d.id).trim();
+                if (!fileUrl) {
+                  fileUrl = getLocalDocFile(docId);
                 }
 
                 let priority = String(d.priority || d.urgencyLevel || 'ปกติ').trim();
@@ -752,9 +788,7 @@
     try {
       const targetAudience = docData.targetType === 'all' ? 'All' : (docData.targetUsers || []).join(',');
 
-      // Step 1: ส่ง metadata ก่อน (ไม่มี fileBase64 เพื่อป้องกัน payload ใหญ่เกิน)
-      // เพื่อให้แน่ใจว่าแถวใน Documents Sheet ถูกสร้างขึ้นเสมอ
-      const metaPayload = {
+      const payload = {
         action: 'addDocument',
         data: {
           title: docData.title,
@@ -766,46 +800,32 @@
           targetUsers: Array.isArray(docData.targetUsers) ? docData.targetUsers : [],
           targetAudience: targetAudience,
           fileName: docData.fileName || 'document.pdf',
-          fileBase64: '',   // ไม่ส่งไฟล์ในรอบแรก เพื่อให้ payload เล็กและไม่เกิน GAS limit
-          fileUrl: '',      // GAS จะสร้าง fileUrl เอง จาก Drive ในรอบที่สอง
+          fileBase64: docData.fileBase64 || '',
+          fileMime: docData.fileMime || 'application/pdf',
           createdBy: state.currentUser ? state.currentUser.id : '',
           creatorName: state.currentUser ? state.currentUser.name : ''
         }
       };
 
-      await fetch(CONFIG.GAS_API_URL, {
+      const response = await fetch(CONFIG.GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(metaPayload),
-        mode: 'no-cors' // จัดการ 302 redirect จาก GAS อัตโนมัติ
+        body: JSON.stringify(payload)
       });
 
-      // Step 2: ส่งไฟล์ base64 แยกต่างหาก (ถ้ามี) ใน background
-      // ใช้ setTimeout เพื่อไม่ block UI
-      if (docData.fileBase64 && docData.fileBase64.length > 0) {
-        setTimeout(async () => {
-          try {
-            const filePayload = {
-              action: 'uploadDocumentFile',
-              data: {
-                docTitle: docData.title,  // ใช้ title จับคู่แถวที่เพิ่งสร้าง
-                fileName: docData.fileName || 'document.pdf',
-                fileBase64: docData.fileBase64,
-                targetAudience: targetAudience
-              }
-            };
-            await fetch(CONFIG.GAS_API_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify(filePayload),
-              mode: 'no-cors'
-            });
-          } catch (fileErr) {
-            console.warn('File upload to Drive deferred/failed (non-critical):', fileErr);
+      if (response.ok) {
+        try {
+          const result = await response.json();
+          if (result && result.status === 'success' && result.fileUrl) {
+            const doc = state.documents.find(d => d.id === docData.id || d.title === docData.title);
+            if (doc) {
+              doc.fileUrl = result.fileUrl;
+              saveToLocalCache();
+              renderCurrentTab();
+            }
           }
-        }, 1500);
+        } catch (_) { }
       }
-
       return true;
     } catch (err) {
       console.warn('sendNewDocumentToServer note:', err);
@@ -826,8 +846,8 @@
     }
 
     // Find user in master list
-    const foundUser = state.users.find(u =>
-      u.id.toLowerCase() === trimmedId.toLowerCase() &&
+    const foundUser = state.users.find(u => 
+      u.id.toLowerCase() === trimmedId.toLowerCase() && 
       (u.pin === trimmedPin || u.id === trimmedPin)
     );
 
@@ -845,7 +865,7 @@
     state.docSubTab = 'pending';
 
     showToast(`ยินดีต้อนรับ ${foundUser.name} (${foundUser.role === 'admin' ? 'ผู้ดูแลระบบ' : 'บุคลากร'})`, 'success');
-
+    
     // Smooth SPA Transition without page reload
     renderAppView();
     // Trigger background sync
@@ -1019,7 +1039,7 @@
     // Apply Search Filter
     const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
     if (searchTerm) {
-      displayDocs = displayDocs.filter(d =>
+      displayDocs = displayDocs.filter(d => 
         (d.title && d.title.toLowerCase().includes(searchTerm)) ||
         (d.id && d.id.toLowerCase().includes(searchTerm))
       );
@@ -1226,20 +1246,8 @@
           <!-- Card Footer (Action Buttons) -->
           <div class="pt-4 border-t-2 border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
-            <!-- Left: Read / Open Document Button -->
-            <button 
-              type="button" 
-              class="open-viewer-btn px-5 py-3 rounded-2xl border-2 border-slate-300 hover:border-hqd-500 hover:bg-hqd-50 text-slate-700 hover:text-hqd-800 text-lg font-bold transition flex items-center justify-center gap-2 cursor-pointer"
-              data-id="${escapeHtml(doc.id)}"
-            >
-              <i class="fa-solid fa-book-open text-xl text-hqd-600"></i>
-              <span>${hasRead ? 'เปิดอ่านอีกครั้ง' : 'เปิดอ่านเอกสาร'}</span>
-            </button>
-
-            <!-- Right: Acknowledge & Tracking Buttons -->
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              
-              <!-- ADMIN SPECIAL: Tracking Overview & Delete Buttons -->
+            <!-- Left: Admin Overview & Delete Buttons -->
+            <div class="flex items-center gap-2 flex-wrap">
               ${isAdmin ? `
                 <button 
                   type="button" 
@@ -1260,35 +1268,35 @@
                   <span>ลบ</span>
                 </button>
               ` : ''}
+            </div>
 
-              <!-- Acknowledge Button State: Read Enforced -->
+            <!-- Right: Reading & Acknowledging Action (Enforced inside Modal) -->
+            <div class="flex items-center gap-2">
               ${isAckByMe ? `
                 <div class="px-5 py-3 rounded-2xl bg-emerald-50 text-emerald-800 border-2 border-emerald-400 text-lg font-bold flex items-center justify-center gap-2 shadow-sm" title="${myAckTime ? `รับทราบเมื่อ: ${formatThaiDateTime(myAckTime)}` : ''}">
                   <i class="fa-solid fa-circle-check text-xl text-emerald-600"></i>
                   <span>รับทราบแล้ว</span>
                 </div>
-              ` : hasRead ? `
                 <button 
                   type="button" 
-                  class="ack-doc-btn px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-lg font-bold shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
+                  class="open-viewer-btn px-4 py-3 rounded-2xl border-2 border-slate-300 hover:border-slate-400 hover:bg-slate-100 text-slate-700 text-base font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                   data-id="${escapeHtml(doc.id)}"
-                  title="คลิกเพื่อบันทึกการรับทราบเอกสาร"
+                  title="เปิดดูเนื้อหาเอกสารอีกครั้ง"
                 >
-                  <i class="fa-solid fa-check text-xl"></i>
-                  <span>กดรับทราบ</span>
+                  <i class="fa-regular fa-file-lines text-slate-500 text-lg"></i>
+                  <span>ดูเอกสาร</span>
                 </button>
               ` : `
                 <button 
                   type="button" 
-                  class="need-read-btn px-5 py-3 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-amber-300 text-lg font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                  class="open-viewer-btn px-6 py-3.5 rounded-2xl bg-hqd-600 hover:bg-hqd-700 active:scale-[0.98] text-white text-lg font-bold shadow-md shadow-hqd-600/30 transition flex items-center justify-center gap-2 cursor-pointer ring-4 ring-transparent hover:ring-hqd-200"
                   data-id="${escapeHtml(doc.id)}"
-                  title="ต้องเปิดอ่านเอกสารก่อนจึงจะสามารถกดรับทราบได้"
+                  title="เปิดอ่านเนื้อหาเอกสารและกดรับทราบ"
                 >
-                  <i class="fa-solid fa-lock text-amber-600"></i>
-                  <span>ต้องเปิดอ่านก่อน</span>
+                  <i class="fa-solid fa-book-open-reader text-xl"></i>
+                  <span>เปิดอ่านและรับทราบ</span>
                 </button>
               `}
-
             </div>
 
           </div>
@@ -1302,28 +1310,11 @@
   };
 
   const attachDocumentCardEvents = () => {
-    // Open Document Viewer
+    // Open Document Viewer & Acknowledge Modal
     document.querySelectorAll('.open-viewer-btn').forEach(btn => {
       btn.onclick = () => {
         const docId = btn.getAttribute('data-id');
         openDocumentViewer(docId);
-      };
-    });
-
-    // Need Read Button (Directs to reading document first)
-    document.querySelectorAll('.need-read-btn').forEach(btn => {
-      btn.onclick = () => {
-        const docId = btn.getAttribute('data-id');
-        showToast('กรุณาเปิดอ่านเนื้อหาเอกสารให้เข้าใจก่อนกดรับทราบ', 'warning', 3500);
-        openDocumentViewer(docId);
-      };
-    });
-
-    // Acknowledge Document (Only accessible when opened/read)
-    document.querySelectorAll('.ack-doc-btn').forEach(btn => {
-      btn.onclick = () => {
-        const docId = btn.getAttribute('data-id');
-        acknowledgeDocument(docId);
       };
     });
 
@@ -1374,10 +1365,10 @@
       const now = new Date();
       const timeStr = `${now.toISOString().split('T')[0]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       doc.acknowledgedDetails[currentUserId] = timeStr;
-
+      
       saveToLocalCache();
       showToast(`ท่านได้รับทราบเอกสาร "${doc.title}" เรียบร้อยแล้ว (ย้ายไปที่แท็บรับทราบแล้ว)`, 'success', 5000);
-
+      
       // Reactive re-render with 0-second latency
       renderCurrentTab();
 
@@ -1404,7 +1395,7 @@
     // Populate Department Filter options dynamically
     const departments = Array.from(new Set(state.users.map(u => u.department || 'ไม่ระบุ'))).sort();
     const currentDeptVal = deptFilter.value;
-    deptFilter.innerHTML = '<option value="all">แผนกทั้งหมด</option>' +
+    deptFilter.innerHTML = '<option value="all">แผนกทั้งหมด</option>' + 
       departments.map(d => `<option value="${escapeHtml(d)}" ${d === currentDeptVal ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('');
 
     // Filter Users
@@ -1412,7 +1403,7 @@
 
     const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
     if (searchTerm) {
-      filteredUsers = filteredUsers.filter(u =>
+      filteredUsers = filteredUsers.filter(u => 
         (u.id && u.id.toLowerCase().includes(searchTerm)) ||
         (u.name && u.name.toLowerCase().includes(searchTerm)) ||
         (u.department && u.department.toLowerCase().includes(searchTerm)) ||
@@ -1636,8 +1627,8 @@
     let displayUsers = [...state.users];
     if (filterTerm) {
       const term = filterTerm.toLowerCase();
-      displayUsers = displayUsers.filter(u =>
-        u.name.toLowerCase().includes(term) ||
+      displayUsers = displayUsers.filter(u => 
+        u.name.toLowerCase().includes(term) || 
         u.id.toLowerCase().includes(term) ||
         (u.department && u.department.toLowerCase().includes(term))
       );
@@ -1688,7 +1679,7 @@
    */
   const handleCreateDocumentSubmit = async (e) => {
     e.preventDefault();
-
+    
     const title = document.getElementById('doc-form-title').value.trim();
     const priority = document.getElementById('doc-form-priority').value;
     const startDate = document.getElementById('doc-form-start-date').value;
@@ -1736,6 +1727,7 @@
     btnIcon.className = 'fa-solid fa-spinner fa-spin text-xl';
 
     const newDocId = `DOC-${new Date().getFullYear()}-${String(state.documents.length + 1).padStart(3, '0')}`;
+    saveLocalDocFile(newDocId, state.selectedCreateBase64);
     const newDoc = {
       id: newDocId,
       title: title,
@@ -1783,10 +1775,10 @@
     document.getElementById('modal-tracking-subtitle').textContent = doc.title;
 
     // Calculate targets & acks
-    const targetIds = doc.targetType === 'all'
-      ? state.users.map(u => u.id)
+    const targetIds = doc.targetType === 'all' 
+      ? state.users.map(u => u.id) 
       : (doc.targetUsers || []);
-
+    
     const ackIds = new Set(doc.acknowledgedUsers || []);
 
     const ackUsers = [];
@@ -1920,19 +1912,30 @@
     const confirmCheckbox = document.getElementById('viewer-confirm-checkbox');
     const actionContainer = document.getElementById('viewer-ack-action-container');
 
-    downloadLink.href = doc.fileUrl || '#';
+    const effectiveUrl = doc.fileUrl || getLocalDocFile(docId);
+    downloadLink.href = effectiveUrl || '#';
+
+    const embedUrl = toEmbeddableDriveUrl(effectiveUrl);
 
     // Check if it's an image or PDF
     const isImage = (doc.fileMime && doc.fileMime.startsWith('image/')) || (doc.fileName && /\.(png|jpe?g|webp|gif)$/i.test(doc.fileName));
+    const emptyNotice = document.getElementById('viewer-empty-notice');
 
-    if (isImage) {
+    if (!effectiveUrl) {
+      if (emptyNotice) emptyNotice.classList.remove('hidden');
       iframe.classList.add('hidden');
-      img.classList.remove('hidden');
-      img.src = doc.fileUrl;
-    } else {
       img.classList.add('hidden');
-      iframe.classList.remove('hidden');
-      iframe.src = doc.fileUrl;
+    } else {
+      if (emptyNotice) emptyNotice.classList.add('hidden');
+      if (isImage) {
+        iframe.classList.add('hidden');
+        img.classList.remove('hidden');
+        img.src = effectiveUrl;
+      } else {
+        img.classList.add('hidden');
+        iframe.classList.remove('hidden');
+        iframe.src = embedUrl;
+      }
     }
 
     // Configure Acknowledge Button & Mandatory Checkbox state
@@ -2143,7 +2146,7 @@
      17. EVENT BINDINGS & APP INITIALIZATION
      ========================================================================== */
   const initializeEventListeners = () => {
-
+    
     // --- 1. Login Form ---
     const loginForm = document.getElementById('login-form');
     if (loginForm) {

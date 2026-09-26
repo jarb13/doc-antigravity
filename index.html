@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th" class="h-full bg-slate-50">
 
 <head>
@@ -952,12 +952,21 @@
             </div>
 
             <!-- Viewer Body (Iframe or Image preview) -->
-            <div class="flex-1 bg-slate-100 p-2 sm:p-4 flex items-center justify-center overflow-hidden">
+            <div class="flex-1 bg-slate-100 p-2 sm:p-4 flex items-center justify-center overflow-hidden relative">
                 <iframe id="viewer-frame"
                     class="w-full h-full rounded-2xl border border-slate-300 bg-white shadow-inner"
                     src="about:blank"></iframe>
                 <img id="viewer-image" class="hidden max-h-full max-w-full object-contain rounded-2xl shadow"
                     alt="เอกสารแนบ" />
+                <div id="viewer-empty-notice" class="hidden flex flex-col items-center justify-center text-center p-8 bg-white rounded-3xl border-2 border-slate-200 max-w-lg shadow-sm">
+                    <div class="w-20 h-20 rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center text-4xl mb-4 shadow-sm">
+                        <i class="fa-solid fa-file-circle-exclamation"></i>
+                    </div>
+                    <h4 class="text-2xl font-bold text-slate-800 mb-2">ไม่พบไฟล์เอกสารแนบ</h4>
+                    <p class="text-slate-600 text-lg">
+                        เอกสารฉบับนี้ไม่มีไฟล์แนบ หรือไฟล์ยังอยู่ระหว่างการประมวลผลบน Google Drive
+                    </p>
+                </div>
             </div>
 
             <!-- Viewer Footer with Mandatory Read Confirmation & Acknowledge Action -->

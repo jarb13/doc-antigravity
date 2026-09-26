@@ -112,11 +112,46 @@ git push -u origin main
 
 ## 🛠️ โค้ดต้นฉบับ Google Apps Script (GAS Reference)
 
-หากต้องการปรับปรุงหรือ Re-deploy Google Apps Script ให้รองรับการทำงานครบทุกฟังก์ชัน สามารถนำโค้ดด้านล่างนี้ไปวางใน `Code.gs` ของ Google Apps Script:
+> [!IMPORTANT]
+> **ขั้นตอนสำคัญมากในการทำให้ไฟล์บันทึกลง Google Drive ได้:**
+> Google Apps Script ไม่อนุญาตให้ Web App ที่เรียกผ่านบุคคลภายนอก (Anonymous Web App) เข้าถึง `DriveApp` จนกว่า **เจ้าของสคริปต์จะกดเรียกใช้ (Run) ในหน้า Script Editor ด้วยตนเองอย่างน้อย 1 ครั้ง** เพื่ออนุมัติสิทธิ์ (OAuth Authorization) ให้โปรเจกต์สามารถเขียนไฟล์ลง Drive ได้
+
+### 📌 ขั้นตอนการอัปเดตและให้สิทธิ์ Google Apps Script (ทำตามนี้เพื่อแก้ปัญหาไฟล์ไม่เข้า Drive)
+
+1. เปิดชีต Google Sheet แล้วไปที่เมนู **ส่วนขยาย (Extensions)** -> **Apps Script**
+2. ลบโค้ดเดิมใน `Code.gs` ออกทั้งหมด แล้วนำโค้ดด้านล่างนี้ไปวางแทนที่
+3. บันทึกโปรเจกต์ (กด `Ctrl + S` หรือไอคอนแผ่นดิสก์)
+4. **อนุมัติสิทธิ์ Drive (ขั้นตอนสำคัญ)**:
+   - ที่แถบเครื่องมือด้านบน ในช่องดรอปดาวน์เลือกฟังก์ชัน ให้เลือก **`authorizeDrive`**
+   - คลิกปุ่ม **"เรียกใช้" (Run)**
+   - จะมีหน้าต่างขึ้นมาเตือนว่า **"ต้องได้รับสิทธิ์" (Authorization Required)** ให้คลิกปุ่ม **"ตรวจสอบสิทธิ์" (Review Permissions)**
+   - เลือกบัญชี Google ของท่าน
+   - หากเจอข้อความเตือนความปลอดภัย ให้คลิก **"ขั้นสูง" (Advanced)** -> คลิก **"ไปยัง ... (ไม่ปลอดภัย) / Go to ... (unsafe)"**
+   - คลิกปุ่ม **"อนุญาต" (Allow)**
+   - ตรวจดูในหน้าต่าง Execution Log ด้านล่าง จะขึ้นข้อความยืนยันว่าเข้าถึงโฟลเดอร์ Drive สำเร็จ
+5. **Deploy เป็นเวอร์ชันใหม่**:
+   - คลิกปุ่มสีน้ำเงิน **"การทำให้ใช้งานได้" (Deploy)** มุมบนขวา -> เลือก **"จัดการการทำให้ใช้งานได้" (Manage deployments)**
+   - คลิกไอคอน **ดินสอ (แก้ไข / Edit)**
+   - ในช่อง **เวอร์ชัน (Version)** ให้เลือกเป็น **"เวอร์ชันใหม่" (New version)**
+   - ในช่อง **ผู้มีสิทธิ์เข้าถึง (Who has access)** ตรวจสอบว่าเป็น **"ทุกคน" (Anyone)**
+   - คลิกปุ่ม **"ทำให้ใช้งานได้" (Deploy)**
+
+---
+
+### โค้ด `Code.gs` ฉบับสมบูรณ์
 
 ```javascript
 const SPREADSHEET_ID = "167gvGXW7EeK4fdKJED1TKhqRiMJmFkte5-sH3Ybigk8";
 const DRIVE_FOLDER_ID = "1kb08cT4u-vMIEA0de7eFcowlI-wiPqNE";
+
+/**
+ * ฟังก์ชันสำหรับกด "เรียกใช้ (Run)" ครั้งแรกใน Google Apps Script Editor
+ * เพื่ออนุมัติสิทธิ์ (OAuth Authorization) ให้สคริปต์สามารถบันทึกไฟล์ลง Google Drive ได้
+ */
+function authorizeDrive() {
+  const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  Logger.log("DriveApp ได้รับการอนุมัติสิทธิ์เรียบร้อยแล้ว: เข้าถึงโฟลเดอร์ " + folder.getName());
+}
 
 function doPost(e) {
   try {
@@ -152,13 +187,23 @@ function doPost(e) {
       for (let i = 1; i < docRows.length; i++) {
         const row = docRows[i];
         if (row[0]) {
+          const rawTitle = String(row[2] || "").trim();
+          let fileUrl = "";
+          let cleanTitle = rawTitle;
+          const linkMatch = rawTitle.match(/\((https?:\/\/[^)]+)\)/);
+          if (linkMatch) {
+            fileUrl = linkMatch[1];
+            cleanTitle = rawTitle.replace(/\s*\((https?:\/\/[^)]+)\)/, "").trim();
+          }
+
           const targetAud = String(row[6] || "all").trim();
           const acks = String(row[7] || "").split(",").map(s => s.trim()).filter(Boolean);
           const prio = String(row[3] || "ปกติ").trim();
           docs.push({
             id: String(row[0]).trim(),
             createdAt: String(row[1] || ""),
-            title: String(row[2] || "").trim(),
+            title: cleanTitle,
+            fileUrl: fileUrl,
             priority: prio,
             urgencyLevel: prio,
             startDate: String(row[4] || ""),
@@ -189,7 +234,6 @@ function doPost(e) {
 
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][0]).trim() === userId) {
-          // คอลัมน์ E คือ Role (1-indexed คือ แถว i + 1, คอลัมน์ 5)
           userSheet.getRange(i + 1, 5).setValue(newRole);
           found = true;
           break;
@@ -282,27 +326,45 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 6. เพิ่มเอกสารเวียนลง Google Sheet ก่อน (ไม่ต้องมีไฟล์)
+    // 6. เพิ่มเอกสารเวียนและอัปโหลดไฟล์ลง Google Drive
     if (action === "addDocument") {
       const data = postData.data;
-
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const docSheet = ss.getSheetByName("Documents");
       
-      // สร้าง docId ที่ไม่ซ้ำโดยใช้ timestamp
       const now = new Date();
       const docId = "DOC-" + now.getFullYear() + "-" + String(docSheet.getLastRow()).padStart(3, "0");
-      
       const priority = data.priority || data.urgencyLevel || "ปกติ";
       const targetAudience = (data.targetType === "all" || String(data.targetAudience || "").toLowerCase() === "all") 
         ? "All" 
         : (Array.isArray(data.targetUsers) ? data.targetUsers.join(",") : (data.targetAudience || "All"));
 
-      // บันทึก metadata ลง Sheet ก่อน (fileUrl ว่างไว้ จะถูกเติมภายหลังจาก uploadDocumentFile)
+      let fileUrl = "";
+      if (data.fileBase64 && data.fileBase64.length > 0) {
+        try {
+          const matches = data.fileBase64.match(/^data:(.*?);base64,(.*)$/);
+          const mimeType = matches ? matches[1] : (data.fileMime || "application/pdf");
+          const base64Data = matches ? matches[2] : data.fileBase64;
+          const decoded = Utilities.base64Decode(base64Data);
+          const blob = Utilities.newBlob(decoded, mimeType, data.fileName || "document.pdf");
+          
+          const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+          const file = folder.createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          fileUrl = file.getUrl();
+        } catch (driveErr) {
+          Logger.log("Drive upload error: " + driveErr.toString());
+        }
+      }
+
+      const fullTitle = fileUrl 
+        ? String(data.title || "").trim() + " (" + fileUrl + ")"
+        : String(data.title || "").trim();
+
       docSheet.appendRow([
         docId,
         now.toISOString(),
-        String(data.title || "").trim(),
+        fullTitle,
         priority,
         String(data.startDate || ""),
         String(data.endDate || ""),
@@ -313,55 +375,7 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
         message: "เพิ่มเอกสารสำเร็จ",
-        docId: docId
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // 6b. อัปโหลดไฟล์ไป Google Drive และอัปเดต URL ใน Sheet (แยก action เพื่อป้องกัน payload ใหญ่)
-    if (action === "uploadDocumentFile") {
-      const data = postData.data;
-      let fileUrl = "";
-
-      if (data.fileBase64) {
-        try {
-          const matches = data.fileBase64.match(/^data:(.*?);base64,(.*)$/);
-          const mimeType = matches ? matches[1] : "application/pdf";
-          const base64Data = matches ? matches[2] : data.fileBase64;
-          const decoded = Utilities.base64Decode(base64Data);
-          const blob = Utilities.newBlob(decoded, mimeType, data.fileName || "document.pdf");
-          const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-          const file = folder.createFile(blob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          fileUrl = file.getUrl();
-        } catch (driveErr) {
-          // หากติดสิทธิ์ Drive ให้ดำเนินการต่อ (นัดจาก metadata บันทึกแล้ว)
-          return ContentService.createTextOutput(JSON.stringify({
-            status: "error",
-            message: "ไม่สามารถอัปโหลดไฟล์ได้: " + driveErr.toString()
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
-      }
-
-      // หาแถวที่ตรงกับ title แล้วอัปเดต fileUrl ใน title (column C = col 3)
-      if (fileUrl) {
-        const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-        const docSheet = ss.getSheetByName("Documents");
-        const rows = docSheet.getDataRange().getValues();
-        const searchTitle = String(data.docTitle || "").trim();
-
-        for (let i = rows.length - 1; i >= 1; i--) {
-          if (String(rows[i][2] || "").trim() === searchTitle) {
-            // เพิ่ม fileUrl ต่อท้าย title
-            const currentTitle = String(rows[i][2]).trim();
-            docSheet.getRange(i + 1, 3).setValue(currentTitle + " (" + fileUrl + ")");
-            break;
-          }
-        }
-      }
-
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "success",
-        message: fileUrl ? "อัปโหลดไฟล์สำเร็จ" : "ไม่มีไฟล์ซัก",
+        docId: docId,
         fileUrl: fileUrl
       })).setMimeType(ContentService.MimeType.JSON);
     }
