@@ -297,6 +297,27 @@ textarea {
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.3) !important;
 }
 
+/* Elder-Friendly Date Picker Styles */
+input[type="date"] {
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 52px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+  transition: all 0.2s ease;
+  font-size: 1.1rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background-color: #e0f2fe;
+  transform: scale(1.1);
+}
+
 /* Print Styles */
 @media print {
 

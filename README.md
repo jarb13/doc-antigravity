@@ -391,6 +391,29 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 8. ลบเอกสารเวียนออกจาก Google Sheet
+    if (action === "deleteDocument") {
+      const docId = String(postData.docId).trim();
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const docSheet = ss.getSheetByName("Documents");
+      if (docSheet) {
+        const rows = docSheet.getDataRange().getValues();
+        for (let i = 1; i < rows.length; i++) {
+          if (String(rows[i][0]).trim() === docId) {
+            docSheet.deleteRow(i + 1);
+            return ContentService.createTextOutput(JSON.stringify({
+              status: "success",
+              message: "ลบเอกสารสำเร็จ"
+            })).setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "ไม่พบรหัสเอกสาร"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       message: "ไม่พบ Action ที่ระบุ"
