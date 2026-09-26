@@ -1,0 +1,998 @@
+﻿<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-50">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเวียนเอกสาร HQD - HQD Document Circulation System</title>
+
+    <!-- Google Fonts: Prompt & Sarabun for Elder-friendly Thai Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome Icons for clear, high-contrast visual cues -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'Sarabun', 'sans-serif'],
+                        sarabun: ['Sarabun', 'sans-serif'],
+                    },
+                    colors: {
+                        hqd: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            200: '#bae0fd',
+                            300: '#7cc7fb',
+                            400: '#38a8f7',
+                            500: '#0e8ce8',
+                            600: '#026fc7',
+                            700: '#0358a1',
+                            800: '#074b85',
+                            900: '#0c3f6e',
+                            950: '#082849',
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom Stylesheet (Elder-friendly base sizing, Glow Effects, Accessibility) -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="min-h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-hqd-200 text-lg">
+
+    <!-- ==================== APP WRAPPER ==================== -->
+    <div id="app" class="flex-1 flex flex-col min-h-screen">
+
+        <!-- Toast Notification Container (Elder-friendly, Large, High Contrast) -->
+        <div id="toast-container"
+            class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-md w-full pointer-events-none" aria-live="polite">
+        </div>
+
+        <!-- ==================== 1. LOGIN SCREEN ==================== -->
+        <section id="login-section"
+            class="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-slate-100 via-sky-50 to-blue-100">
+            <div
+                class="w-full max-w-xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 p-8 sm:p-10 transition-all">
+
+                <!-- Header / Logo -->
+                <div class="text-center mb-8">
+                    <div
+                        class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-hqd-600 text-white shadow-lg shadow-hqd-500/30 mb-4 ring-8 ring-hqd-100">
+                        <i class="fa-solid fa-file-signature text-4xl"></i>
+                    </div>
+                    <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">ระบบเวียนเอกสาร HQD</h1>
+                    <p class="text-slate-600 text-xl mt-2 font-medium">HQD Document Circulation System</p>
+                    <div
+                        class="inline-block mt-3 px-4 py-1.5 bg-blue-50 text-hqd-700 text-base font-semibold rounded-full border border-hqd-200">
+                        <i class="fa-solid fa-hospital mr-1.5"></i> งานพัฒนาคุณภาพและบริหารความเสี่ยง (HQD)
+                    </div>
+                </div>
+
+                <!-- Login Form -->
+                <form id="login-form" class="space-y-6" autocomplete="off">
+
+                    <!-- Staff ID Input -->
+                    <div>
+                        <label for="login-id" class="block text-xl font-semibold text-slate-800 mb-2">
+                            <i class="fa-solid fa-id-card text-hqd-600 mr-2"></i>รหัสพนักงาน (Staff ID)
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="login-id" name="staffId" required placeholder="กรุณาระบุรหัสพนักงาน"
+                                class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-600 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400" />
+                            <span
+                                class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
+                                <i class="fa-solid fa-user"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- PIN Input -->
+                    <div>
+                        <label for="login-pin" class="block text-xl font-semibold text-slate-800 mb-2">
+                            <i class="fa-solid fa-key text-hqd-600 mr-2"></i>รหัสผ่าน / PIN
+                        </label>
+                        <div class="relative">
+                            <input type="password" id="login-pin" name="pin" required placeholder="กรุณาระบุรหัสผ่าน"
+                                class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-600 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400" />
+                            <button type="button" id="toggle-pin-btn"
+                                class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 text-xl p-2 rounded-lg"
+                                title="แสดง/ซ่อนรหัสผ่าน" aria-label="แสดงหรือซ่อนรหัสผ่าน">
+                                <i class="fa-solid fa-eye" id="toggle-pin-icon"></i>
+                            </button>
+                        </div>
+                        <p class="text-sm text-slate-500 mt-2">
+                            * ค่าเริ่มต้นของ PIN สำหรับเข้าสู่ระบบคือรหัสพนักงานของท่าน
+                        </p>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="login-submit-btn"
+                        class="w-full py-4 px-6 text-2xl font-bold text-white bg-hqd-600 hover:bg-hqd-700 active:scale-[0.99] rounded-2xl shadow-xl shadow-hqd-600/30 transition flex items-center justify-center gap-3 cursor-pointer ring-4 ring-transparent focus:ring-hqd-300">
+                        <span>เข้าสู่ระบบ</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </form>
+
+                <!-- Security Notice -->
+                <div class="mt-8 pt-6 border-t border-slate-200">
+                    <p class="text-base text-slate-500 flex items-center gap-2">
+                        <i class="fa-solid fa-lock text-slate-400"></i>
+                        รหัสผ่านเริ่มต้นคือรหัสพนักงานของท่าน กรุณาติดต่อผู้ดูแลระบบหากไม่สามารถเข้าสู่ระบบได้
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== 2. MAIN APPLICATION (SPA) ==================== -->
+        <div id="main-section" class="hidden flex-1 flex flex-col min-h-screen">
+
+            <!-- Top Navigation Bar -->
+            <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-2 border-slate-200 shadow-sm">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-24 gap-4">
+
+                        <!-- App Brand & Title -->
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-2xl bg-hqd-600 text-white flex items-center justify-center text-2xl shadow-md ring-4 ring-hqd-100 flex-shrink-0">
+                                <i class="fa-solid fa-file-signature"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                                        ระบบเวียนเอกสาร HQD</h1>
+                                    <span id="user-role-badge"
+                                        class="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                        User
+                                    </span>
+                                </div>
+                                <p class="text-slate-500 text-sm sm:text-base hidden sm:block">
+                                    โรงพยาบาลและสำนักงานพัฒนาระบบคุณภาพ (HQD)
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- User Info & Controls -->
+                        <div class="flex items-center gap-3 sm:gap-5">
+
+                            <!-- Font Size Accessibility Switcher (Elder Friendly) -->
+                            <div class="hidden md:flex items-center bg-slate-100 rounded-2xl p-1 border border-slate-200"
+                                title="ปรับขนาดตัวอักษร">
+                                <button type="button" id="font-size-sm"
+                                    class="px-2.5 py-1 text-sm rounded-xl font-bold text-slate-600 hover:text-slate-900 transition">ก</button>
+                                <button type="button" id="font-size-md"
+                                    class="px-2.5 py-1 text-base rounded-xl font-bold bg-white text-hqd-700 shadow-sm transition">ก+</button>
+                                <button type="button" id="font-size-lg"
+                                    class="px-2.5 py-1 text-lg rounded-xl font-bold text-slate-600 hover:text-slate-900 transition">ก++</button>
+                            </div>
+
+                            <!-- Sync Status Indicator -->
+                            <div id="sync-status"
+                                class="flex items-center gap-2 text-sm sm:text-base text-slate-500 bg-slate-100 px-3 py-2 rounded-2xl border border-slate-200"
+                                title="สถานะการเชื่อมต่อ">
+                                <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block animate-pulse"
+                                    id="sync-indicator-dot"></span>
+                                <span id="sync-status-text" class="hidden lg:inline">พร้อมใช้งาน</span>
+                                <button type="button" id="manual-refresh-btn" class="hover:text-hqd-600 transition ml-1"
+                                    title="ซิงค์ข้อมูลใหม่">
+                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                </button>
+                            </div>
+
+                            <!-- Logged-in User Profile Pill -->
+                            <div class="flex items-center gap-3 pl-2 sm:pl-4 border-l-2 border-slate-200">
+                                <div
+                                    class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-hqd-600 to-sky-400 text-white flex items-center justify-center text-xl font-bold shadow">
+                                    <span id="header-avatar-initial">ธ</span>
+                                </div>
+                                <div class="hidden sm:block text-left">
+                                    <div id="header-user-name"
+                                        class="font-bold text-slate-900 text-lg leading-tight truncate max-w-[180px]">
+                                        นาย ธนพล จันทรพร</div>
+                                    <div id="header-user-dept" class="text-sm text-slate-500 truncate max-w-[180px]">
+                                        เจ้าหน้าที่บริหารงานทั่วไป</div>
+                                </div>
+                            </div>
+
+                            <!-- Logout Button -->
+                            <button type="button" id="logout-btn"
+                                class="px-4 py-2.5 text-base sm:text-lg font-semibold text-rose-600 hover:bg-rose-50 border-2 border-rose-200 hover:border-rose-400 rounded-2xl transition flex items-center gap-2 cursor-pointer"
+                                title="ออกจากระบบ">
+                                <i class="fa-solid fa-right-from-bracket"></i>
+                                <span class="hidden sm:inline">ออก</span>
+                            </button>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs (Documents vs Personnel for Admin) -->
+                <nav class="bg-slate-50 border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="flex space-x-4 sm:space-x-8 py-2 overflow-x-auto">
+
+                            <!-- Tab 1: Documents Circulation (Always Visible) -->
+                            <button type="button" id="tab-btn-docs"
+                                class="nav-tab active flex items-center gap-3 px-5 py-3 rounded-2xl text-xl font-bold transition whitespace-nowrap">
+                                <i class="fa-solid fa-folder-open text-2xl"></i>
+                                <span>เอกสารเวียน</span>
+                                <span id="badge-doc-count"
+                                    class="ml-1 px-2.5 py-0.5 text-sm rounded-full bg-hqd-100 text-hqd-800 font-bold">0</span>
+                            </button>
+
+                            <!-- Tab 2: Personnel Management (Admin Only) -->
+                            <button type="button" id="tab-btn-users"
+                                class="nav-tab hidden flex items-center gap-3 px-5 py-3 rounded-2xl text-xl font-bold transition whitespace-nowrap text-slate-600 hover:text-slate-900 hover:bg-white">
+                                <i class="fa-solid fa-users-gear text-2xl"></i>
+                                <span>จัดการบุคลากร HQD</span>
+                                <span id="badge-user-count"
+                                    class="ml-1 px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-700 font-bold">0</span>
+                            </button>
+
+                        </div>
+                    </div>
+                </nav>
+            </header>
+
+            <!-- Main Content Container -->
+            <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+                <!-- ==================== TAB CONTENT: DOCUMENTS ==================== -->
+                <section id="tab-content-docs" class="space-y-8">
+
+                    <!-- Top Action Bar (Legend, Search, Filters, Create Button) -->
+                    <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border-2 border-slate-200 space-y-6">
+
+                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+
+                            <!-- Title & Glow Legend (Elder-friendly instruction) -->
+                            <div>
+                                <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+                                    <i class="fa-solid fa-list-check text-hqd-600"></i>
+                                    <span>รายการเอกสารเวียนองค์กร</span>
+                                </h2>
+                                <p class="text-slate-600 text-lg mt-1">
+                                    ตรวจสอบและกด "รับทราบ" เอกสารที่ได้รับมอบหมาย
+                                </p>
+
+                                <!-- Status Glow Explanation Pills -->
+                                <div class="mt-4 flex flex-wrap items-center gap-2 sm:gap-3 text-base">
+                                    <span class="text-slate-500 font-medium mr-1">คำอธิบายสีเรืองแสง:</span>
+                                    <span
+                                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-medium">
+                                        <span
+                                            class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#22c55e] flex-shrink-0"></span>
+                                        รับทราบครบ 100%
+                                    </span>
+                                    <span
+                                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border-2 border-amber-400 font-medium">
+                                        <span
+                                            class="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b] flex-shrink-0"></span>
+                                        ใกล้ครบกำหนด (ใน 3 วัน)
+                                    </span>
+                                    <span
+                                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 text-rose-800 border-2 border-rose-400 font-medium">
+                                        <span
+                                            class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ef4444] flex-shrink-0"></span>
+                                        เกินกำหนด (Overdue)
+                                    </span>
+                                    <span
+                                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 text-slate-700 border-2 border-slate-300 font-medium">
+                                        <span class="w-3.5 h-3.5 rounded-full bg-slate-400 flex-shrink-0"></span>
+                                        ปกติ
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Admin Action: Create Document Button -->
+                            <div id="admin-create-doc-container" class="hidden flex-shrink-0">
+                                <button type="button" id="open-create-doc-modal-btn"
+                                    class="w-full sm:w-auto px-6 py-4 bg-hqd-600 hover:bg-hqd-700 text-white text-xl font-bold rounded-2xl shadow-lg shadow-hqd-600/30 transition flex items-center justify-center gap-3 cursor-pointer ring-4 ring-transparent hover:ring-hqd-200">
+                                    <i class="fa-solid fa-plus-circle text-2xl"></i>
+                                    <span>สร้างเอกสารเวียนใหม่</span>
+                                </button>
+                            </div>
+
+                        </div>
+
+                        <!-- ==================== DOCUMENT VIEW SUB-TABS (Elder-Friendly Separation) ==================== -->
+                        <div
+                            class="pt-4 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            <div
+                                class="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5 bg-slate-100 rounded-2xl border-2 border-slate-200">
+
+                                <!-- Subtab 1: รอฉันรับทราบ (ยังไม่อ่าน - Default for Users) -->
+                                <button type="button" id="doc-subtab-pending"
+                                    class="doc-subtab active px-5 py-3 rounded-xl font-bold text-lg flex items-center gap-2.5 transition cursor-pointer">
+                                    <i class="fa-solid fa-clock text-amber-500"></i>
+                                    <span>รอฉันรับทราบ (ยังไม่อ่าน)</span>
+                                    <span id="badge-subtab-pending"
+                                        class="px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-800 font-bold">0</span>
+                                </button>
+
+                                <!-- Subtab 2: รับทราบแล้ว (อ่านแล้ว) -->
+                                <button type="button" id="doc-subtab-acked"
+                                    class="doc-subtab px-5 py-3 rounded-xl font-bold text-lg flex items-center gap-2.5 transition cursor-pointer">
+                                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                                    <span>รับทราบแล้ว (อ่านแล้ว)</span>
+                                    <span id="badge-subtab-acked"
+                                        class="px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-800 font-bold">0</span>
+                                </button>
+
+                                <!-- Subtab 3: เอกสารทั้งหมด -->
+                                <button type="button" id="doc-subtab-all"
+                                    class="doc-subtab px-5 py-3 rounded-xl font-bold text-lg flex items-center gap-2.5 transition cursor-pointer">
+                                    <i class="fa-solid fa-layer-group text-slate-500"></i>
+                                    <span>เอกสารทั้งหมด</span>
+                                    <span id="badge-subtab-all"
+                                        class="px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-800 font-bold">0</span>
+                                </button>
+
+                            </div>
+
+                            <!-- Elder-Friendly Active View Description -->
+                            <div class="text-slate-600 text-base flex items-center gap-2 px-1">
+                                <i class="fa-solid fa-circle-info text-hqd-600 text-lg"></i>
+                                <span id="doc-subtab-hint"
+                                    class="font-medium">แสดงเฉพาะเอกสารที่ท่านยังไม่ได้กดรับทราบ</span>
+                            </div>
+                        </div>
+
+                        <!-- Filters Bar (Search, Status Filter, Priority Filter) -->
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 pt-4 border-t border-slate-100">
+
+                            <!-- Search Box -->
+                            <div class="md:col-span-6 relative">
+                                <input type="text" id="doc-search-input" placeholder="ค้นหาชื่อเอกสาร หรือรหัสเอกสาร..."
+                                    class="w-full pl-12 pr-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white" />
+                                <i
+                                    class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none"></i>
+                            </div>
+
+                            <!-- Status Filter Dropdown -->
+                            <div class="md:col-span-3">
+                                <select id="doc-status-filter"
+                                    class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800">
+                                    <option value="all">สถานะความเร่งด่วนทั้งหมด</option>
+                                    <option value="glow-yellow">🟡 ใกล้ครบกำหนด (ใน 3 วัน)</option>
+                                    <option value="glow-red">🔴 เกินกำหนด (Overdue)</option>
+                                    <option value="glow-green">🟢 รับทราบครบ 100%</option>
+                                    <option value="glow-none">⚪ ปกติ</option>
+                                </select>
+                            </div>
+
+                            <!-- Priority Filter Dropdown -->
+                            <div class="md:col-span-3">
+                                <select id="doc-priority-filter"
+                                    class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold">
+                                    <option value="all">ความสำคัญทั้งหมด</option>
+                                    <option value="ปกติ">🟢 ปกติ</option>
+                                    <option value="ด่วน">🟠 ด่วน</option>
+                                    <option value="ด่วนที่สุด">🔴 ด่วนที่สุด</option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- Document Cards Grid (Large Elder-Friendly Cards) -->
+                    <div id="docs-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                        <!-- Dynamic Document Cards will be rendered here by app.js -->
+                    </div>
+
+                    <!-- Empty State Container (Dynamic for Pending / Acked / Search) -->
+                    <div id="docs-empty-state" class="hidden">
+                        <!-- Rendered dynamically by app.js -->
+                    </div>
+
+                </section>
+
+
+                <!-- ==================== TAB CONTENT: PERSONNEL MANAGEMENT (ADMIN) ==================== -->
+                <section id="tab-content-users" class="hidden space-y-8">
+
+                    <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border-2 border-slate-200 space-y-6">
+
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+                                    <i class="fa-solid fa-users text-hqd-600"></i>
+                                    <span>จัดการบุคลากร HQD</span>
+                                </h2>
+                                <p class="text-slate-600 text-lg mt-1">
+                                    จัดการรายชื่อ กำหนดบทบาทสิทธิ์ (Role) และตรวจสอบข้อมูลบุคลากรแบบ Real-time
+                                </p>
+                            </div>
+
+                            <!-- Add Personnel Button -->
+                            <button type="button" id="open-add-user-modal-btn"
+                                class="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <span>เพิ่มบุคลากรใหม่</span>
+                            </button>
+                        </div>
+
+                        <!-- Search & Filters -->
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 pt-4 border-t border-slate-100">
+
+                            <!-- Search User Input -->
+                            <div class="md:col-span-6 relative">
+                                <input type="text" id="user-search-input"
+                                    placeholder="ค้นหาด้วยรหัส, ชื่อ-นามสกุล, หรือแผนก..."
+                                    class="w-full pl-12 pr-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white" />
+                                <i
+                                    class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none"></i>
+                            </div>
+
+                            <!-- Filter Department -->
+                            <div class="md:col-span-3">
+                                <select id="user-dept-filter"
+                                    class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 outline-none transition bg-slate-50 focus:bg-white text-slate-800">
+                                    <option value="all">แผนกทั้งหมด</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+
+                            <!-- Filter Role -->
+                            <div class="md:col-span-3">
+                                <select id="user-role-filter"
+                                    class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 outline-none transition bg-slate-50 focus:bg-white text-slate-800">
+                                    <option value="all">บทบาททั้งหมด</option>
+                                    <option value="admin">Admin (ผู้ดูแลระบบ)</option>
+                                    <option value="user">User (บุคลากรทั่วไป)</option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <!-- Personnel Table (Responsive Elder-Friendly) -->
+                        <div class="overflow-x-auto rounded-2xl border-2 border-slate-200">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr
+                                        class="bg-slate-100 text-slate-800 text-lg font-bold border-b-2 border-slate-200">
+                                        <th class="py-4 px-6">รหัสพนักงาน</th>
+                                        <th class="py-4 px-6">ชื่อ - นามสกุล</th>
+                                        <th class="py-4 px-6">แผนก / ตำแหน่ง</th>
+                                        <th class="py-4 px-6">อีเมลองค์กร</th>
+                                        <th class="py-4 px-6 text-center">บทบาท (Role)</th>
+                                        <th class="py-4 px-6 text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body" class="divide-y divide-slate-200 bg-white text-lg">
+                                    <!-- Dynamic rows rendered by app.js -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Users Count Summary -->
+                        <div class="flex items-center justify-between text-base text-slate-500 pt-2">
+                            <div id="users-summary-count">แสดง 0 จากทั้งหมด 0 คน</div>
+                        </div>
+
+                    </div>
+
+                </section>
+
+            </main>
+
+            <!-- Footer -->
+            <footer class="bg-white border-t border-slate-200 py-6 text-center text-slate-500 text-base">
+                <div class="max-w-7xl mx-auto px-4">
+                    <p>© 2026 ระบบเวียนเอกสารองค์กร งานพัฒนาคุณภาพและบริหารความเสี่ยง (HQD) • Two-Way Sync กับ Google
+                        Sheets &
+                        Drive</p>
+                </div>
+            </footer>
+
+        </div>
+
+    </div>
+
+
+    <!-- ==================== 3. MODALS ==================== -->
+
+    <!-- A. CREATE DOCUMENT MODAL (ADMIN) -->
+    <div id="modal-create-doc"
+        class="modal-overlay hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+        role="dialog" aria-modal="true" aria-labelledby="modal-create-doc-title">
+        <div
+            class="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up">
+
+            <!-- Modal Header -->
+            <div class="px-6 sm:px-8 py-5 border-b-2 border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-hqd-600 text-white flex items-center justify-center text-2xl shadow">
+                        <i class="fa-solid fa-file-circle-plus"></i>
+                    </div>
+                    <div>
+                        <h3 id="modal-create-doc-title" class="text-2xl font-bold text-slate-900">สร้างเอกสารเวียนใหม่
+                        </h3>
+                        <p class="text-slate-500 text-base">กรอกข้อมูลและเลือกผู้รับทราบเอกสาร</p>
+                    </div>
+                </div>
+                <button type="button"
+                    class="modal-close-btn p-2 text-slate-400 hover:text-slate-700 text-2xl rounded-xl transition"
+                    data-modal="modal-create-doc" aria-label="ปิดหน้าต่าง">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-6 sm:p-8 overflow-y-auto space-y-6 flex-1 text-lg">
+
+                <form id="create-doc-form" class="space-y-6">
+
+                    <!-- Document Title -->
+                    <div>
+                        <label for="doc-form-title" class="block font-bold text-slate-800 mb-2">
+                            ชื่อเรื่องเอกสาร <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" id="doc-form-title" required
+                            placeholder="เช่น ประกาศแนวทางการปฏิบัติงานประจำปี 2569"
+                            class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition" />
+                    </div>
+
+                    <!-- Priority & Dates Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                        <!-- Priority (Only 3 levels: ปกติ, ด่วน, ด่วนที่สุด) -->
+                        <div>
+                            <label for="doc-form-priority" class="block font-bold text-slate-800 mb-2">
+                                ระดับความสำคัญ <span class="text-rose-500">*</span>
+                            </label>
+                            <select id="doc-form-priority" required
+                                class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white transition font-semibold">
+                                <option value="ปกติ">🟢 ปกติ (Normal)</option>
+                                <option value="ด่วน">🟠 ด่วน (Urgent)</option>
+                                <option value="ด่วนที่สุด">🔴 ด่วนที่สุด (Most Urgent)</option>
+                            </select>
+                        </div>
+
+
+                        <!-- Start Date (วัน เดือน ปี) -->
+                        <div>
+                            <label for="doc-form-start-date" class="block font-bold text-slate-800 mb-2">
+                                วันที่เริ่มสื่อสาร (วัน เดือน ปี) <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="date" id="doc-form-start-date" required
+                                class="w-full px-4 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none bg-white transition font-semibold text-slate-800 cursor-pointer shadow-sm" />
+                            <div id="doc-form-start-date-display"
+                                class="mt-2 text-sm font-semibold text-hqd-700 bg-hqd-50 px-3 py-1.5 rounded-xl border border-hqd-200 inline-flex items-center gap-2">
+                                <i class="fa-regular fa-calendar text-hqd-600"></i>
+                                <span class="date-text">-</span>
+                            </div>
+                        </div>
+
+                        <!-- End Date (Deadline) (วัน เดือน ปี) -->
+                        <div>
+                            <label for="doc-form-end-date" class="block font-bold text-slate-800 mb-2">
+                                วันที่สิ้นสุด (วัน เดือน ปี) <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="date" id="doc-form-end-date" required
+                                class="w-full px-4 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none bg-white transition font-semibold text-slate-800 cursor-pointer shadow-sm" />
+                            <div id="doc-form-end-date-display"
+                                class="mt-2 text-sm font-semibold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 inline-flex items-center gap-2">
+                                <i class="fa-regular fa-calendar-check text-rose-600"></i>
+                                <span class="date-text">-</span>
+                            </div>
+                        </div>
+
+
+                    </div>
+
+                    <!-- File Upload (PDF / Image) -->
+                    <div>
+                        <label class="block font-bold text-slate-800 mb-2">
+                            แนบไฟล์เอกสาร (PDF หรือ รูปภาพ) <span class="text-rose-500">*</span>
+                        </label>
+                        <div id="file-drop-zone"
+                            class="border-3 border-dashed border-slate-300 hover:border-hqd-500 rounded-3xl p-6 text-center cursor-pointer bg-slate-50 hover:bg-hqd-50/50 transition">
+                            <input type="file" id="doc-form-file" accept=".pdf,image/*" class="hidden" required />
+                            <div id="file-drop-prompt">
+                                <i class="fa-solid fa-cloud-arrow-up text-4xl text-hqd-600 mb-3"></i>
+                                <div class="text-xl font-bold text-slate-800">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่
+                                </div>
+                                <div class="text-base text-slate-500 mt-1">รองรับไฟล์ PDF, JPG, PNG (สูงสุด 10MB)</div>
+                            </div>
+                            <div id="file-selected-info"
+                                class="hidden flex items-center justify-between p-4 bg-white rounded-2xl border-2 border-hqd-300">
+                                <div class="flex items-center gap-3 text-left">
+                                    <i class="fa-solid fa-file-pdf text-3xl text-rose-500" id="file-preview-icon"></i>
+                                    <div>
+                                        <div id="file-name-display"
+                                            class="font-bold text-slate-800 truncate max-w-xs sm:max-w-md">
+                                            filename.pdf</div>
+                                        <div id="file-size-display" class="text-sm text-slate-500">1.2 MB</div>
+                                    </div>
+                                </div>
+                                <button type="button" id="remove-file-btn"
+                                    class="p-2 text-rose-500 hover:text-rose-700 text-xl" title="ลบไฟล์">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Target Audience Selection -->
+                    <div class="p-6 bg-slate-50 rounded-3xl border-2 border-slate-200 space-y-4">
+                        <label class="block font-bold text-xl text-slate-900">
+                            กลุ่มเป้าหมายผู้รับเอกสาร <span class="text-rose-500">*</span>
+                        </label>
+
+                        <div class="flex flex-wrap gap-6 text-xl">
+                            <label
+                                class="inline-flex items-center gap-3 cursor-pointer p-3 rounded-2xl hover:bg-white border-2 border-transparent hover:border-slate-300 transition">
+                                <input type="radio" name="targetType" value="all" checked
+                                    class="w-6 h-6 text-hqd-600 focus:ring-hqd-500" />
+                                <span class="font-semibold text-slate-800">ส่งทุกคนในองค์กร (All Staff)</span>
+                            </label>
+
+                            <label
+                                class="inline-flex items-center gap-3 cursor-pointer p-3 rounded-2xl hover:bg-white border-2 border-transparent hover:border-slate-300 transition">
+                                <input type="radio" name="targetType" value="specific"
+                                    class="w-6 h-6 text-hqd-600 focus:ring-hqd-500" />
+                                <span class="font-semibold text-slate-800">ระบุบุคคล (Specific Personnel)</span>
+                            </label>
+                        </div>
+
+                        <!-- Specific Personnel Checkbox Grid (Constraint: All pre-checked by default!) -->
+                        <div id="specific-users-container"
+                            class="hidden mt-4 pt-4 border-t-2 border-slate-200 space-y-4">
+
+                            <div
+                                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+                                <span class="text-base text-slate-600 font-medium">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>
+                                    ระบบเลือกบุคลากรทุกคนไว้ล่วงหน้าแล้ว
+                                    ให้คลิกเอาเครื่องหมายถูกออกเฉพาะคนที่ไม่เกี่ยวข้อง
+                                </span>
+                                <div class="flex gap-2">
+                                    <button type="button" id="select-all-users-btn"
+                                        class="px-3 py-1.5 text-base font-semibold text-hqd-700 bg-hqd-50 hover:bg-hqd-100 rounded-xl transition">
+                                        เลือกทุกคน
+                                    </button>
+                                    <button type="button" id="deselect-all-users-btn"
+                                        class="px-3 py-1.5 text-base font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition">
+                                        ยกเลิกทั้งหมด
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Quick search in modal -->
+                            <input type="text" id="modal-user-search-input"
+                                placeholder="พิมพ์ค้นหาชื่อ หรือแผนกในรายการนี้..."
+                                class="w-full px-4 py-3 text-base rounded-xl border border-slate-300 outline-none focus:border-hqd-500" />
+
+                            <!-- The Checkbox Grid -->
+                            <div id="target-users-grid"
+                                class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto p-2 border-2 border-slate-200 rounded-2xl bg-white">
+                                <!-- Checkboxes dynamically generated by app.js -->
+                            </div>
+                            <div class="text-sm text-slate-500 text-right" id="target-count-indicator">
+                                เลือกแล้ว 0 คน
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 sm:px-8 py-5 border-t-2 border-slate-100 bg-slate-50 flex items-center justify-end gap-4">
+                <button type="button"
+                    class="modal-close-btn px-6 py-3.5 text-lg font-bold text-slate-600 hover:bg-slate-200 rounded-2xl transition"
+                    data-modal="modal-create-doc">
+                    ยกเลิก
+                </button>
+                <button type="submit" form="create-doc-form" id="create-doc-submit-btn"
+                    class="px-8 py-3.5 text-xl font-bold text-white bg-hqd-600 hover:bg-hqd-700 rounded-2xl shadow-lg shadow-hqd-600/30 transition flex items-center gap-3 cursor-pointer">
+                    <span id="create-doc-btn-text">บันทึกและเวียนเอกสาร</span>
+                    <i class="fa-solid fa-paper-plane" id="create-doc-btn-icon"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- B. TRACKING OVERVIEW MODAL (ADMIN) -->
+    <div id="modal-tracking"
+        class="modal-overlay hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+        role="dialog" aria-modal="true" aria-labelledby="modal-tracking-title">
+        <div
+            class="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up">
+
+            <!-- Modal Header -->
+            <div class="px-6 sm:px-8 py-5 border-b-2 border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl shadow">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h3 id="modal-tracking-title" class="text-2xl font-bold text-slate-900">ภาพรวมสถานะการรับทราบ
+                        </h3>
+                        <p id="modal-tracking-subtitle" class="text-slate-500 text-base truncate max-w-sm sm:max-w-xl">
+                            ชื่อเอกสาร...
+                        </p>
+                    </div>
+                </div>
+                <button type="button"
+                    class="modal-close-btn p-2 text-slate-400 hover:text-slate-700 text-2xl rounded-xl transition"
+                    data-modal="modal-tracking" aria-label="ปิดหน้าต่าง">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Tracking Summary Counters -->
+            <div class="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-2xl font-bold">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm text-slate-500 font-semibold">กลุ่มเป้าหมายทั้งหมด</div>
+                        <div id="track-total-count" class="text-3xl font-bold text-slate-900">0</div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl font-bold">
+                        <i class="fa-solid fa-check-double"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm text-emerald-700 font-semibold">ผู้ที่รับทราบแล้ว</div>
+                        <div id="track-ack-count" class="text-3xl font-bold text-emerald-600">0</div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-rose-200 shadow-sm flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-2xl font-bold">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm text-rose-700 font-semibold">ผู้ที่ยังไม่อ่าน</div>
+                        <div id="track-pending-count" class="text-3xl font-bold text-rose-600">0</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Tracking Tabs & Lists (Elder-Friendly Dual Tabs) -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+                <!-- Toggle Tabs -->
+                <div class="flex border-b-2 border-slate-200 gap-4">
+                    <button type="button" id="track-tab-ack-btn"
+                        class="pb-3 text-xl font-bold border-b-4 border-emerald-500 text-emerald-700 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>ผู้ที่รับทราบแล้ว</span>
+                        <span id="track-tab-ack-badge"
+                            class="px-2.5 py-0.5 text-sm rounded-full bg-emerald-100 text-emerald-800">0</span>
+                    </button>
+
+                    <button type="button" id="track-tab-pending-btn"
+                        class="pb-3 text-xl font-bold border-b-4 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                        <span>ผู้ที่ยังไม่อ่าน</span>
+                        <span id="track-tab-pending-badge"
+                            class="px-2.5 py-0.5 text-sm rounded-full bg-rose-100 text-rose-800">0</span>
+                    </button>
+                </div>
+
+                <!-- Tab 1: Acknowledged Users List -->
+                <div id="track-list-ack" class="space-y-3">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Tab 2: Pending Unread Users List -->
+                <div id="track-list-pending" class="hidden space-y-3">
+                    <!-- Populated dynamically -->
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 sm:px-8 py-4 border-t-2 border-slate-100 bg-slate-50 flex items-center justify-between">
+                <button type="button" id="copy-unread-btn"
+                    class="px-4 py-2.5 text-base font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition flex items-center gap-2">
+                    <i class="fa-solid fa-copy"></i>
+                    <span>คัดลอกรายชื่อผู้ยังไม่อ่าน</span>
+                </button>
+                <button type="button"
+                    class="modal-close-btn px-6 py-2.5 text-lg font-bold text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-xl transition"
+                    data-modal="modal-tracking">
+                    ปิด
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- C. ADD / EDIT PERSONNEL MODAL (ADMIN) -->
+    <div id="modal-user-form"
+        class="modal-overlay hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+        role="dialog" aria-modal="true">
+        <div
+            class="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 w-full max-w-xl overflow-hidden animate-scale-up">
+
+            <!-- Header -->
+            <div class="px-6 sm:px-8 py-5 border-b-2 border-slate-100 flex items-center justify-between bg-slate-50">
+                <h3 id="modal-user-form-title" class="text-2xl font-bold text-slate-900">เพิ่มบุคลากรใหม่</h3>
+                <button type="button"
+                    class="modal-close-btn p-2 text-slate-400 hover:text-slate-700 text-2xl rounded-xl transition"
+                    data-modal="modal-user-form">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Form -->
+            <form id="user-mgmt-form" class="p-6 sm:p-8 space-y-5 text-lg">
+                <input type="hidden" id="user-form-mode" value="add" />
+
+                <div>
+                    <label for="user-form-id" class="block font-bold text-slate-800 mb-2">
+                        รหัสพนักงาน (ID) <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" id="user-form-id" required placeholder="เช่น 030112"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <div>
+                    <label for="user-form-name" class="block font-bold text-slate-800 mb-2">
+                        ชื่อ - นามสกุล <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" id="user-form-name" required placeholder="เช่น นาย สมชาย ใจดี"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <div>
+                    <label for="user-form-dept" class="block font-bold text-slate-800 mb-2">
+                        แผนก / ตำแหน่ง <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" id="user-form-dept" required placeholder="เช่น พยาบาล, นักวิชาการพัฒนาคุณภาพ"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <div>
+                    <label for="user-form-email" class="block font-bold text-slate-800 mb-2">
+                        อีเมลองค์กร (Corporate Email)
+                    </label>
+                    <input type="email" id="user-form-email" placeholder="เช่น somchai@hospital.org"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <div>
+                    <label for="user-form-role" class="block font-bold text-slate-800 mb-2">
+                        บทบาทในระบบ (Role) <span class="text-rose-500">*</span>
+                    </label>
+                    <select id="user-form-role" required
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white">
+                        <option value="user">User (บุคลากรทั่วไป)</option>
+                        <option value="admin">Admin (ผู้ดูแลระบบ)</option>
+                    </select>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                    <button type="button"
+                        class="modal-close-btn px-6 py-3 text-lg font-bold text-slate-600 hover:bg-slate-200 rounded-2xl transition"
+                        data-modal="modal-user-form">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" id="user-form-submit-btn"
+                        class="px-8 py-3 text-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-2xl shadow-lg transition flex items-center gap-2 cursor-pointer">
+                        <span>บันทึกข้อมูล</span>
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+
+    <!-- D. DOCUMENT VIEWER MODAL -->
+    <div id="modal-doc-viewer"
+        class="modal-overlay hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6"
+        role="dialog" aria-modal="true">
+        <div
+            class="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden animate-scale-up">
+
+            <!-- Viewer Header -->
+            <div class="px-6 py-4 border-b-2 border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <i class="fa-solid fa-file-pdf text-3xl text-rose-500 flex-shrink-0"></i>
+                    <div class="overflow-hidden">
+                        <h3 id="viewer-doc-title" class="text-xl sm:text-2xl font-bold text-slate-900 truncate">
+                            ชื่อเอกสาร</h3>
+                        <p id="viewer-doc-meta" class="text-sm sm:text-base text-slate-500 truncate">ข้อมูลเอกสาร</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a id="viewer-download-link" href="#" target="_blank" rel="noopener noreferrer"
+                        class="px-4 py-2 text-base font-bold text-hqd-700 bg-hqd-50 hover:bg-hqd-100 rounded-xl transition flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <span class="hidden sm:inline">เปิดแท็บใหม่</span>
+                    </a>
+                    <button type="button"
+                        class="modal-close-btn p-2 text-slate-400 hover:text-slate-700 text-2xl rounded-xl transition"
+                        data-modal="modal-doc-viewer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Viewer Body (Iframe or Image preview) -->
+            <div class="flex-1 bg-slate-100 p-2 sm:p-4 flex items-center justify-center overflow-hidden">
+                <iframe id="viewer-frame"
+                    class="w-full h-full rounded-2xl border border-slate-300 bg-white shadow-inner"
+                    src="about:blank"></iframe>
+                <img id="viewer-image" class="hidden max-h-full max-w-full object-contain rounded-2xl shadow"
+                    alt="เอกสารแนบ" />
+            </div>
+
+            <!-- Viewer Footer with Mandatory Read Confirmation & Acknowledge Action -->
+            <div
+                class="px-6 py-4 border-t-2 border-slate-200 bg-slate-50 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+
+                <!-- Confirmation Checkbox (Required before acknowledging) -->
+                <label id="viewer-confirm-container"
+                    class="flex items-center gap-3 p-3.5 rounded-2xl bg-white border-2 border-slate-300 hover:border-emerald-500 cursor-pointer transition select-none shadow-sm flex-1">
+                    <input type="checkbox" id="viewer-confirm-checkbox"
+                        class="w-7 h-7 text-emerald-600 rounded-lg focus:ring-emerald-500 cursor-pointer" />
+                    <span class="text-lg sm:text-xl font-bold text-slate-800">
+                        <i class="fa-solid fa-book-open-reader text-emerald-600 mr-1.5"></i>
+                        ข้าพเจ้าได้เปิดอ่านและเข้าใจสาระสำคัญของเอกสารนี้เรียบร้อยแล้ว <span
+                            class="text-rose-500">*</span>
+                    </span>
+                </label>
+
+                <!-- Action Button Container -->
+                <div id="viewer-ack-action-container" class="flex-shrink-0 flex items-center justify-end">
+                    <button type="button" id="viewer-ack-btn" disabled
+                        class="w-full lg:w-auto px-8 py-3.5 text-xl font-bold text-slate-400 bg-slate-200 border-2 border-slate-300 rounded-2xl transition flex items-center justify-center gap-3 opacity-70 cursor-not-allowed">
+                        <i class="fa-solid fa-lock text-xl" id="viewer-ack-btn-icon"></i>
+                        <span id="viewer-ack-btn-text">กรุณาติ๊กยืนยันว่าได้อ่านแล้ว</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Application JavaScript wrapped in IIFE -->
+    <script src="app.js"></script>
+</body>
+
+</html>
