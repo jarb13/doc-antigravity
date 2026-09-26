@@ -85,7 +85,7 @@
                 id="login-id" 
                 name="staffId" 
                 required 
-                placeholder="กรอกรหัสพนักงาน เช่น 020482" 
+                placeholder="กรุณาระบุรหัสพนักงาน" 
                 class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-600 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400"
               />
               <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
@@ -105,7 +105,7 @@
                 id="login-pin" 
                 name="pin" 
                 required 
-                placeholder="กรอก PIN เช่น 020482" 
+                placeholder="กรุณาระบุรหัสผ่าน" 
                 class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-600 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400"
               />
               <button 
@@ -134,42 +134,12 @@
           </button>
         </form>
 
-        <!-- Quick Demo Accounts Helper (Elder-friendly ease of testing) -->
+        <!-- Security Notice -->
         <div class="mt-8 pt-6 border-t border-slate-200">
-          <p class="text-base text-slate-600 font-semibold mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-circle-info text-hqd-600"></i> บัญชีทดสอบด่วน (คลิกเพื่อเข้าสู่ระบบทันที):
+          <p class="text-base text-slate-500 flex items-center gap-2">
+            <i class="fa-solid fa-lock text-slate-400"></i>
+            รหัสผ่านเริ่มต้นคือรหัสพนักงานของท่าน กรุณาติดต่อผู้ดูแลระบบหากไม่สามารถเข้าสู่ระบบได้
           </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button 
-              type="button" 
-              class="quick-login-btn p-3 rounded-xl border-2 border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition text-left flex items-center gap-3"
-              data-id="020482" 
-              data-pin="020482"
-            >
-              <div class="w-10 h-10 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-lg">
-                <i class="fa-solid fa-user-shield"></i>
-              </div>
-              <div class="overflow-hidden">
-                <div class="font-bold text-slate-800 text-base">นาย ธนพล (Admin)</div>
-                <div class="text-sm text-slate-500">รหัส 020482</div>
-              </div>
-            </button>
-            
-            <button 
-              type="button" 
-              class="quick-login-btn p-3 rounded-xl border-2 border-slate-200 hover:border-hqd-500 hover:bg-hqd-50 transition text-left flex items-center gap-3"
-              data-id="000826" 
-              data-pin="000826"
-            >
-              <div class="w-10 h-10 rounded-lg bg-hqd-600 text-white flex items-center justify-center font-bold text-lg">
-                <i class="fa-solid fa-user"></i>
-              </div>
-              <div class="overflow-hidden">
-                <div class="font-bold text-slate-800 text-base">นาง วันทนา (User)</div>
-                <div class="text-sm text-slate-500">รหัส 000826 / พยาบาล</div>
-              </div>
-            </button>
-          </div>
         </div>
 
       </div>
@@ -303,20 +273,20 @@
                 <div class="mt-4 flex flex-wrap items-center gap-2 sm:gap-3 text-base">
                   <span class="text-slate-500 font-medium mr-1">คำอธิบายสีเรืองแสง:</span>
                   <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-medium">
-                    <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#22c55e]"></span>
-                    🟢 รับทราบครบ 100%
+                    <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#22c55e] flex-shrink-0"></span>
+                    รับทราบครบ 100%
                   </span>
                   <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border-2 border-amber-400 font-medium">
-                    <span class="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b]"></span>
-                    🟡 ใกล้ครบกำหนด (ใน 3 วัน)
+                    <span class="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b] flex-shrink-0"></span>
+                    ใกล้ครบกำหนด (ใน 3 วัน)
                   </span>
                   <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 text-rose-800 border-2 border-rose-400 font-medium">
-                    <span class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ef4444]"></span>
-                    🔴 เกินกำหนด (Overdue)
+                    <span class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ef4444] flex-shrink-0"></span>
+                    เกินกำหนด (Overdue)
                   </span>
                   <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 text-slate-700 border-2 border-slate-300 font-medium">
-                    <span class="w-3.5 h-3.5 rounded-full bg-slate-400"></span>
-                    ⚪ ปกติ
+                    <span class="w-3.5 h-3.5 rounded-full bg-slate-400 flex-shrink-0"></span>
+                    ปกติ
                   </span>
                 </div>
               </div>

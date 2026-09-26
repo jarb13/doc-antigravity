@@ -282,11 +282,46 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 6. เพิ่มเอกสารเวียนและอัปโหลดไฟล์ไปยัง Google Drive (มี Try-Catch ป้องกัน Drive permission error)
+    // 6. เพิ่มเอกสารเวียนลง Google Sheet ก่อน (ไม่ต้องมีไฟล์)
     if (action === "addDocument") {
       const data = postData.data;
-      let fileUrl = "";
+
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const docSheet = ss.getSheetByName("Documents");
       
+      // สร้าง docId ที่ไม่ซ้ำโดยใช้ timestamp
+      const now = new Date();
+      const docId = "DOC-" + now.getFullYear() + "-" + String(docSheet.getLastRow()).padStart(3, "0");
+      
+      const priority = data.priority || data.urgencyLevel || "ปกติ";
+      const targetAudience = (data.targetType === "all" || String(data.targetAudience || "").toLowerCase() === "all") 
+        ? "All" 
+        : (Array.isArray(data.targetUsers) ? data.targetUsers.join(",") : (data.targetAudience || "All"));
+
+      // บันทึก metadata ลง Sheet ก่อน (fileUrl ว่างไว้ จะถูกเติมภายหลังจาก uploadDocumentFile)
+      docSheet.appendRow([
+        docId,
+        now.toISOString(),
+        String(data.title || "").trim(),
+        priority,
+        String(data.startDate || ""),
+        String(data.endDate || ""),
+        targetAudience,
+        ""  // ผู้รับทราบเริ่มต้นว่าง
+      ]);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "เพิ่มเอกสารสำเร็จ",
+        docId: docId
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 6b. อัปโหลดไฟล์ไป Google Drive และอัปเดต URL ใน Sheet (แยก action เพื่อป้องกัน payload ใหญ่)
+    if (action === "uploadDocumentFile") {
+      const data = postData.data;
+      let fileUrl = "";
+
       if (data.fileBase64) {
         try {
           const matches = data.fileBase64.match(/^data:(.*?);base64,(.*)$/);
@@ -299,35 +334,34 @@ function doPost(e) {
           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
           fileUrl = file.getUrl();
         } catch (driveErr) {
-          // หากติดสิทธิ์การเข้าถึง Google Drive ให้บันทึกลิงก์เดิมหรือข้ามไฟล์ เพื่อให้บันทึกลง Sheet สำเร็จเสมอ
-          fileUrl = data.fileUrl || "";
+          // หากติดสิทธิ์ Drive ให้ดำเนินการต่อ (นัดจาก metadata บันทึกแล้ว)
+          return ContentService.createTextOutput(JSON.stringify({
+            status: "error",
+            message: "ไม่สามารถอัปโหลดไฟล์ได้: " + driveErr.toString()
+          })).setMimeType(ContentService.MimeType.JSON);
         }
       }
 
-      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const docSheet = ss.getSheetByName("Documents");
-      const docId = "DOC-" + new Date().getFullYear() + "-" + ("00" + (docSheet.getLastRow())).slice(-3);
-      
-      const priority = data.priority || data.urgencyLevel || "ปกติ";
-      const targetAudience = (data.targetType === "all" || String(data.targetAudience).toLowerCase() === "all") 
-        ? "All" 
-        : (Array.isArray(data.targetUsers) ? data.targetUsers.join(",") : (data.targetAudience || "All"));
+      // หาแถวที่ตรงกับ title แล้วอัปเดต fileUrl ใน title (column C = col 3)
+      if (fileUrl) {
+        const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+        const docSheet = ss.getSheetByName("Documents");
+        const rows = docSheet.getDataRange().getValues();
+        const searchTitle = String(data.docTitle || "").trim();
 
-      docSheet.appendRow([
-        docId,
-        new Date().toISOString(),
-        data.title + (fileUrl ? " (" + fileUrl + ")" : ""),
-        priority,
-        data.startDate,
-        data.endDate,
-        targetAudience,
-        "" // ผู้รับทราบเริ่มต้น
-      ]);
+        for (let i = rows.length - 1; i >= 1; i--) {
+          if (String(rows[i][2] || "").trim() === searchTitle) {
+            // เพิ่ม fileUrl ต่อท้าย title
+            const currentTitle = String(rows[i][2]).trim();
+            docSheet.getRange(i + 1, 3).setValue(currentTitle + " (" + fileUrl + ")");
+            break;
+          }
+        }
+      }
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        message: "เพิ่มเอกสารสำเร็จ",
-        docId: docId,
+        message: fileUrl ? "อัปโหลดไฟล์สำเร็จ" : "ไม่มีไฟล์ซัก",
         fileUrl: fileUrl
       })).setMimeType(ContentService.MimeType.JSON);
     }

@@ -525,11 +525,20 @@
       if (response.ok) {
         const result = await response.json();
         if (result && result.status === 'success' && result.data) {
-          // Reconcile Users with Local Role Overrides
+          // Reconcile Users:
+          // Sheet เป็น source of truth สำหรับ role
+          // แต่ถ้ามี local override ที่ยังรอ sync ก็ยังคงใช้ override นั้นก่อน
+          // เมื่อ Sheet ได้รับการอัปเดตแล้ว override จะถูกล้างออกอัตโนมัติในรอบถัดไป
           if (Array.isArray(result.data.users) && result.data.users.length > 0) {
             state.users = result.data.users.map(u => {
-              if (roleOverrides[u.id] && roleOverrides[u.id].role) {
-                return { ...u, role: roleOverrides[u.id].role };
+              const override = roleOverrides[u.id];
+              if (override && override.role) {
+                // ถ้า Sheet มี role ตรงกับ override แล้ว ให้ลบ override ทิ้ง (sync สำเร็จ)
+                if (override.role === u.role) {
+                  deleteRoleOverride(u.id);
+                }
+                // ใช้ override เสมอจนกว่า Sheet จะตรงกัน
+                return { ...u, role: override.role };
               }
               return u;
             });
@@ -769,7 +778,10 @@
   const sendNewDocumentToServer = async (docData) => {
     try {
       const targetAudience = docData.targetType === 'all' ? 'All' : (docData.targetUsers || []).join(',');
-      const payload = {
+
+      // Step 1: ส่ง metadata ก่อน (ไม่มี fileBase64 เพื่อป้องกัน payload ใหญ่เกิน)
+      // เพื่อให้แน่ใจว่าแถวใน Documents Sheet ถูกสร้างขึ้นเสมอ
+      const metaPayload = {
         action: 'addDocument',
         data: {
           title: docData.title,
@@ -778,11 +790,11 @@
           startDate: docData.startDate,
           endDate: docData.endDate,
           targetType: docData.targetType,
-          targetUsers: docData.targetUsers,
+          targetUsers: Array.isArray(docData.targetUsers) ? docData.targetUsers : [],
           targetAudience: targetAudience,
           fileName: docData.fileName || 'document.pdf',
-          fileBase64: docData.fileBase64 || '',
-          fileUrl: docData.fileUrl || '',
+          fileBase64: '',   // ไม่ส่งไฟล์ในรอบแรก เพื่อให้ payload เล็กและไม่เกิน GAS limit
+          fileUrl: '',      // GAS จะสร้าง fileUrl เอง จาก Drive ในรอบที่สอง
           createdBy: state.currentUser ? state.currentUser.id : '',
           creatorName: state.currentUser ? state.currentUser.name : ''
         }
@@ -791,9 +803,36 @@
       await fetch(CONFIG.GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        mode: 'no-cors' // This prevents CORS errors on Google Drive 302 Redirects!
+        body: JSON.stringify(metaPayload),
+        mode: 'no-cors' // จัดการ 302 redirect จาก GAS อัตโนมัติ
       });
+
+      // Step 2: ส่งไฟล์ base64 แยกต่างหาก (ถ้ามี) ใน background
+      // ใช้ setTimeout เพื่อไม่ block UI
+      if (docData.fileBase64 && docData.fileBase64.length > 0) {
+        setTimeout(async () => {
+          try {
+            const filePayload = {
+              action: 'uploadDocumentFile',
+              data: {
+                docTitle: docData.title,  // ใช้ title จับคู่แถวที่เพิ่งสร้าง
+                fileName: docData.fileName || 'document.pdf',
+                fileBase64: docData.fileBase64,
+                targetAudience: targetAudience
+              }
+            };
+            await fetch(CONFIG.GAS_API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify(filePayload),
+              mode: 'no-cors'
+            });
+          } catch (fileErr) {
+            console.warn('File upload to Drive deferred/failed (non-critical):', fileErr);
+          }
+        }, 1500);
+      }
+
       return true;
     } catch (err) {
       console.warn('sendNewDocumentToServer note:', err);
@@ -2114,16 +2153,7 @@
       };
     }
 
-    // Quick demo login accounts
-    document.querySelectorAll('.quick-login-btn').forEach(btn => {
-      btn.onclick = () => {
-        const id = btn.getAttribute('data-id');
-        const pin = btn.getAttribute('data-pin');
-        document.getElementById('login-id').value = id;
-        document.getElementById('login-pin').value = pin;
-        login(id, pin);
-      };
-    });
+    // (Quick demo login buttons removed for security)
 
     // --- 2. Top Navigation & Logout ---
     document.getElementById('logout-btn').onclick = logout;
