@@ -150,7 +150,7 @@ body {
 }
 
 /* ==========================================================================
-   3. Navigation Tabs
+   3. Navigation Tabs & Document Sub-Tabs
    ========================================================================== */
 .nav-tab {
   color: #475569;
@@ -167,6 +167,27 @@ body {
   color: #0358a1 !important;
   background-color: #e0effe !important;
   border-bottom-color: #0e8ce8 !important;
+}
+
+/* Document View Sub-Tabs (Elder-Friendly Unread vs Read Separation) */
+.doc-subtab {
+  color: #475569;
+  background-color: transparent;
+  border: 2px solid transparent;
+  user-select: none;
+}
+
+.doc-subtab:hover {
+  color: #026fc7;
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.doc-subtab.active {
+  color: #026fc7 !important;
+  background-color: #ffffff !important;
+  border-color: #93c5fd !important;
+  box-shadow: 0 4px 10px -2px rgba(14, 140, 232, 0.2), 0 2px 4px -2px rgba(14, 140, 232, 0.1) !important;
 }
 
 /* ==========================================================================

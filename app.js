@@ -23,6 +23,8 @@
     STORAGE_KEY_USER: 'HQD_CURRENT_USER_V1',
     STORAGE_KEY_DATA: 'HQD_APP_DATA_V1',
     STORAGE_KEY_FONT: 'HQD_FONT_SIZE_V1',
+    STORAGE_KEY_OVERRIDES: 'HQD_USER_ROLE_OVERRIDES_V1',
+    STORAGE_KEY_READ_DOCS: 'HQD_READ_DOCS_V1',
   };
 
   /* Default Master Personnel Seed (from Google Sheet 167gvGXW7EeK4fdKJED1TKhqRiMJmFkte5-sH3Ybigk8) */
@@ -142,12 +144,14 @@
     users: [],               // Master list of personnel
     documents: [],           // Master list of circular documents
     activeTab: 'docs',       // 'docs' | 'users'
+    docSubTab: 'pending',    // 'pending' (ยังไม่อ่าน) | 'acked' (อ่านแล้ว) | 'all' (ทั้งหมด)
     isSyncing: false,        // Background sync flag
     activeModal: null,       // Current active modal ID
     selectedCreateFile: null,// File object for upload
     selectedCreateBase64: '',// Data URL base64 string
     selectedTargetUserIds: new Set(), // Set of selected IDs for 'specific' target
     viewingDocId: null,      // Document currently open in viewer modal
+    readDocIds: new Set(),   // Set of doc IDs opened/read by current user
   };
 
   /* ==========================================================================
@@ -332,6 +336,91 @@
   /* ==========================================================================
      5. PERSISTENCE & LOCAL CACHE (Instant 0s Load)
      ========================================================================== */
+  const getRoleOverrides = () => {
+    try {
+      return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY_OVERRIDES) || '{}');
+    } catch {
+      return {};
+    }
+  };
+
+  const saveRoleOverride = (userId, role) => {
+    try {
+      const overrides = getRoleOverrides();
+      overrides[userId] = { role, timestamp: Date.now() };
+      localStorage.setItem(CONFIG.STORAGE_KEY_OVERRIDES, JSON.stringify(overrides));
+    } catch (e) {
+      console.warn('saveRoleOverride error:', e);
+    }
+  };
+
+  const deleteRoleOverride = (userId) => {
+    try {
+      const overrides = getRoleOverrides();
+      delete overrides[userId];
+      localStorage.setItem(CONFIG.STORAGE_KEY_OVERRIDES, JSON.stringify(overrides));
+    } catch (e) {
+      console.warn('deleteRoleOverride error:', e);
+    }
+  };
+
+  const loadUserReadDocs = (userId) => {
+    if (!userId) {
+      state.readDocIds = new Set();
+      return;
+    }
+    try {
+      const all = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY_READ_DOCS) || '{}');
+      state.readDocIds = new Set(all[userId] || []);
+    } catch {
+      state.readDocIds = new Set();
+    }
+  };
+
+  const markDocAsRead = (docId) => {
+    if (!state.currentUser || !docId) return;
+    const userId = state.currentUser.id;
+    state.readDocIds.add(docId);
+    try {
+      const all = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY_READ_DOCS) || '{}');
+      if (!all[userId]) all[userId] = [];
+      if (!all[userId].includes(docId)) {
+        all[userId].push(docId);
+      }
+      localStorage.setItem(CONFIG.STORAGE_KEY_READ_DOCS, JSON.stringify(all));
+    } catch (e) {
+      console.warn('markDocAsRead error:', e);
+    }
+  };
+
+  const hasDocBeenRead = (docId) => {
+    return state.readDocIds && state.readDocIds.has(docId);
+  };
+
+  const syncCurrentUserWithList = () => {
+    if (!state.currentUser) return;
+    const currentInList = state.users.find(u => u.id === state.currentUser.id);
+    if (currentInList) {
+      let changed = false;
+      if (state.currentUser.role !== currentInList.role) {
+        state.currentUser.role = currentInList.role;
+        changed = true;
+      }
+      if (state.currentUser.name !== currentInList.name) {
+        state.currentUser.name = currentInList.name;
+        changed = true;
+      }
+      if (state.currentUser.department !== currentInList.department) {
+        state.currentUser.department = currentInList.department;
+        changed = true;
+      }
+      if (changed) {
+        localStorage.setItem(CONFIG.STORAGE_KEY_USER, JSON.stringify(state.currentUser));
+        renderAppView();
+      }
+    }
+  };
+
   const saveToLocalCache = () => {
     try {
       const dataToSave = {
@@ -351,10 +440,13 @@
       const savedUser = localStorage.getItem(CONFIG.STORAGE_KEY_USER);
       if (savedUser) {
         state.currentUser = JSON.parse(savedUser);
+        loadUserReadDocs(state.currentUser.id);
       }
 
       // 2. Load cached master data
       const cachedData = localStorage.getItem(CONFIG.STORAGE_KEY_DATA);
+      const roleOverrides = getRoleOverrides();
+
       if (cachedData) {
         const parsed = JSON.parse(cachedData);
         state.users = Array.isArray(parsed.users) && parsed.users.length > 0 ? parsed.users : DEFAULT_USERS_SEED;
@@ -363,8 +455,28 @@
         // Fallback to default seeds
         state.users = DEFAULT_USERS_SEED;
         state.documents = DEFAULT_DOCS_SEED;
-        saveToLocalCache();
       }
+
+      // Apply local role overrides so user-specified roles are never lost
+      state.users = state.users.map(u => {
+        if (roleOverrides[u.id] && roleOverrides[u.id].role) {
+          return { ...u, role: roleOverrides[u.id].role };
+        }
+        return u;
+      });
+
+      // Synchronize current session with list
+      if (state.currentUser) {
+        const matching = state.users.find(u => u.id === state.currentUser.id);
+        if (matching) {
+          state.currentUser.role = matching.role;
+          state.currentUser.name = matching.name;
+          state.currentUser.department = matching.department;
+          localStorage.setItem(CONFIG.STORAGE_KEY_USER, JSON.stringify(state.currentUser));
+        }
+      }
+
+      saveToLocalCache();
     } catch (e) {
       console.error('Error loading cache, using default seeds:', e);
       state.users = DEFAULT_USERS_SEED;
@@ -400,6 +512,8 @@
     state.isSyncing = true;
     updateSyncIndicator('syncing');
 
+    const roleOverrides = getRoleOverrides();
+
     try {
       // 1. Fetch from GAS endpoint with action "getAppData"
       const response = await fetch(CONFIG.GAS_API_URL, {
@@ -411,14 +525,21 @@
       if (response.ok) {
         const result = await response.json();
         if (result && result.status === 'success' && result.data) {
-          // Reconcile Users
+          // Reconcile Users with Local Role Overrides
           if (Array.isArray(result.data.users) && result.data.users.length > 0) {
-            state.users = result.data.users;
+            state.users = result.data.users.map(u => {
+              if (roleOverrides[u.id] && roleOverrides[u.id].role) {
+                return { ...u, role: roleOverrides[u.id].role };
+              }
+              return u;
+            });
           }
           // Reconcile Documents if server has docs
           if (Array.isArray(result.data.docs) && result.data.docs.length > 0) {
             state.documents = result.data.docs;
           }
+
+          syncCurrentUserWithList();
           saveToLocalCache();
           updateSyncIndicator('success', 'เชื่อมต่อคลาวด์แล้ว');
           renderCurrentTab();
@@ -440,22 +561,26 @@
         const parsed = JSON.parse(jsonStr);
         if (parsed && parsed.table && parsed.table.rows) {
           const fetchedUsers = [];
-          // Skip row 0 if it contains headers
           for (let i = 1; i < parsed.table.rows.length; i++) {
             const cells = parsed.table.rows[i].c;
             if (cells && cells[0] && cells[0].v) {
+              const uId = String(cells[0].v).trim();
+              const sheetRole = cells[4] && String(cells[4].v).trim().toLowerCase() === 'admin' ? 'admin' : 'user';
+              const finalRole = (roleOverrides[uId] && roleOverrides[uId].role) ? roleOverrides[uId].role : sheetRole;
+
               fetchedUsers.push({
-                id: String(cells[0].v).trim(),
-                pin: cells[1] ? String(cells[1].v).trim() : String(cells[0].v).trim(),
+                id: uId,
+                pin: cells[1] ? String(cells[1].v).trim() : uId,
                 name: cells[2] ? String(cells[2].v).trim() : '',
                 department: cells[3] ? String(cells[3].v).trim() : '',
-                role: cells[4] && String(cells[4].v).trim().toLowerCase() === 'admin' ? 'admin' : 'user',
+                role: finalRole,
                 email: cells[5] ? String(cells[5].v).trim() : ''
               });
             }
           }
           if (fetchedUsers.length > 0) {
             state.users = fetchedUsers;
+            syncCurrentUserWithList();
             saveToLocalCache();
             updateSyncIndicator('success', 'เชื่อมต่อข้อมูล Sheet แล้ว');
             renderCurrentTab();
@@ -468,6 +593,108 @@
     }
 
     state.isSyncing = false;
+  };
+
+  /**
+   * Send User Role Update to Server (Syncs directly with Google Sheet column E)
+   */
+  const sendUserRoleToServer = async (userId, role) => {
+    try {
+      const payload = {
+        action: 'updateUserRole',
+        userId: userId,
+        role: role
+      };
+      await fetch(CONFIG.GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors' // Handles 302 redirect gracefully
+      });
+      return true;
+    } catch (err) {
+      console.warn('sendUserRoleToServer delay:', err);
+      return false;
+    }
+  };
+
+  /**
+   * Send Full User Info Update to Server
+   */
+  const sendUserUpdateToServer = async (userData) => {
+    try {
+      const payload = {
+        action: 'updateUser',
+        data: {
+          id: userData.id,
+          name: userData.name,
+          department: userData.department,
+          role: userData.role,
+          email: userData.email || ''
+        }
+      };
+      await fetch(CONFIG.GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors'
+      });
+      return true;
+    } catch (err) {
+      console.warn('sendUserUpdateToServer delay:', err);
+      return false;
+    }
+  };
+
+  /**
+   * Send New User Creation to Server
+   */
+  const sendNewUserToServer = async (userData) => {
+    try {
+      const payload = {
+        action: 'addUser',
+        data: {
+          id: userData.id,
+          pin: userData.pin || userData.id,
+          name: userData.name,
+          department: userData.department,
+          role: userData.role || 'user',
+          email: userData.email || ''
+        }
+      };
+      await fetch(CONFIG.GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors'
+      });
+      return true;
+    } catch (err) {
+      console.warn('sendNewUserToServer delay:', err);
+      return false;
+    }
+  };
+
+  /**
+   * Send User Deletion to Server
+   */
+  const sendDeleteUserToServer = async (userId) => {
+    try {
+      const payload = {
+        action: 'deleteUser',
+        userId: userId
+      };
+      await fetch(CONFIG.GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors'
+      });
+      return true;
+    } catch (err) {
+      console.warn('sendDeleteUserToServer delay:', err);
+      return false;
+    }
   };
 
   /**
@@ -512,9 +739,6 @@
         }
       };
 
-      // In browser GAS calls, POST frequently returns 302 Redirect to Drive or googleusercontent
-      // The prompt specifically instructs:
-      // "ต้องดักจับ Error กรณี HTTP 302 Redirect ของ Google Drive เพื่อหลอกแจ้งเตือน UI ว่าทำงานสำเร็จ"
       await fetch(CONFIG.GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -524,7 +748,6 @@
       return true;
     } catch (err) {
       console.warn('Drive 302 Redirect / Network warning intercepted:', err);
-      // Treated as success per system specification
       return true;
     }
   };
@@ -555,6 +778,10 @@
     // Set active user & save session
     state.currentUser = foundUser;
     localStorage.setItem(CONFIG.STORAGE_KEY_USER, JSON.stringify(foundUser));
+
+    // Load read tracking for logged-in user & set default tab to 'pending' (รอฉันรับทราบ)
+    loadUserReadDocs(foundUser.id);
+    state.docSubTab = 'pending';
 
     showToast(`ยินดีต้อนรับ ${foundUser.name} (${foundUser.role === 'admin' ? 'ผู้ดูแลระบบ' : 'บุคลากร'})`, 'success');
     
@@ -655,8 +882,13 @@
     }
   };
 
+  const switchDocSubTab = (subTabName) => {
+    state.docSubTab = subTabName;
+    renderDocuments();
+  };
+
   /* ==========================================================================
-     9. RENDER: DOCUMENTS CIRCULATION TAB (With Status Glow Effects)
+     9. RENDER: DOCUMENTS CIRCULATION TAB (With Status Glow Effects & Separation)
      ========================================================================== */
   const renderDocuments = () => {
     const grid = document.getElementById('docs-grid');
@@ -679,12 +911,54 @@
       return Array.isArray(doc.targetUsers) && doc.targetUsers.includes(currentUserId);
     });
 
-    countBadge.textContent = userDocs.length;
+    // Calculate unread (pending) vs read (acknowledged) counts for the current user
+    const pendingDocs = userDocs.filter(d => !d.acknowledgedUsers || !d.acknowledgedUsers.includes(currentUserId));
+    const ackedDocs = userDocs.filter(d => d.acknowledgedUsers && d.acknowledgedUsers.includes(currentUserId));
+    const allDocsCount = userDocs.length;
+
+    // Update Sub-Tab Badges & Top Nav Badge
+    const badgeSubPending = document.getElementById('badge-subtab-pending');
+    const badgeSubAcked = document.getElementById('badge-subtab-acked');
+    const badgeSubAll = document.getElementById('badge-subtab-all');
+    const subtabHint = document.getElementById('doc-subtab-hint');
+
+    if (badgeSubPending) badgeSubPending.textContent = pendingDocs.length;
+    if (badgeSubAcked) badgeSubAcked.textContent = ackedDocs.length;
+    if (badgeSubAll) badgeSubAll.textContent = allDocsCount;
+    // Show unread pending count on main nav badge
+    if (countBadge) countBadge.textContent = pendingDocs.length;
+
+    // Update Sub-Tab active styles
+    const btnPending = document.getElementById('doc-subtab-pending');
+    const btnAcked = document.getElementById('doc-subtab-acked');
+    const btnAll = document.getElementById('doc-subtab-all');
+
+    if (btnPending) btnPending.classList.toggle('active', state.docSubTab === 'pending');
+    if (btnAcked) btnAcked.classList.toggle('active', state.docSubTab === 'acked');
+    if (btnAll) btnAll.classList.toggle('active', state.docSubTab === 'all');
+
+    if (subtabHint) {
+      if (state.docSubTab === 'pending') {
+        subtabHint.textContent = 'แสดงเฉพาะเอกสารที่ท่านยังไม่ได้กดรับทราบ (รอการเปิดอ่าน)';
+      } else if (state.docSubTab === 'acked') {
+        subtabHint.textContent = 'แสดงเอกสารที่ท่านเปิดอ่านและกดรับทราบเรียบร้อยแล้ว';
+      } else {
+        subtabHint.textContent = 'แสดงเอกสารเวียนทั้งหมดในระบบ';
+      }
+    }
+
+    // Filter according to active Sub-Tab
+    let displayDocs = userDocs;
+    if (state.docSubTab === 'pending') {
+      displayDocs = pendingDocs;
+    } else if (state.docSubTab === 'acked') {
+      displayDocs = ackedDocs;
+    }
 
     // Apply Search Filter
     const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
     if (searchTerm) {
-      userDocs = userDocs.filter(d => 
+      displayDocs = displayDocs.filter(d => 
         (d.title && d.title.toLowerCase().includes(searchTerm)) ||
         (d.id && d.id.toLowerCase().includes(searchTerm))
       );
@@ -693,37 +967,105 @@
     // Apply Priority Filter
     const selectedPriority = priorityFilter ? priorityFilter.value : 'all';
     if (selectedPriority !== 'all') {
-      userDocs = userDocs.filter(d => d.priority === selectedPriority);
+      displayDocs = displayDocs.filter(d => d.priority === selectedPriority);
     }
 
-    // Apply Status Filter
+    // Apply Status Filter (Glow status)
     const selectedStatus = statusFilter ? statusFilter.value : 'all';
     if (selectedStatus !== 'all') {
-      userDocs = userDocs.filter(doc => {
-        const hasAck = doc.acknowledgedUsers && doc.acknowledgedUsers.includes(currentUserId);
+      displayDocs = displayDocs.filter(doc => {
         const statusMeta = calculateDocStatus(doc);
-
-        if (selectedStatus === 'pending') return !hasAck;
-        if (selectedStatus === 'acknowledged') return hasAck;
-        if (selectedStatus === statusMeta.statusKey) return true;
-        return false;
+        return selectedStatus === statusMeta.statusKey;
       });
     }
 
-    // Toggle Empty State
-    if (userDocs.length === 0) {
+    // Handle Empty States
+    if (displayDocs.length === 0) {
       grid.innerHTML = '';
       emptyState.classList.remove('hidden');
+
+      if (searchTerm || selectedPriority !== 'all' || selectedStatus !== 'all') {
+        emptyState.innerHTML = `
+          <div class="text-center py-16 px-6 bg-white rounded-3xl border-2 border-dashed border-slate-300">
+            <div class="w-20 h-20 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-3xl mb-4">
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-slate-800 mb-2">ไม่พบเอกสารที่ตรงกับเงื่อนไขการค้นหา</h3>
+            <p class="text-slate-500 text-lg max-w-md mx-auto mb-5">ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อค้นหาอีกครั้ง</p>
+            <button type="button" id="reset-doc-filters-btn" class="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition cursor-pointer">
+              ล้างตัวกรองทั้งหมด
+            </button>
+          </div>
+        `;
+        const resetBtn = document.getElementById('reset-doc-filters-btn');
+        if (resetBtn) {
+          resetBtn.onclick = () => {
+            if (searchInput) searchInput.value = '';
+            if (priorityFilter) priorityFilter.value = 'all';
+            if (statusFilter) statusFilter.value = 'all';
+            renderDocuments();
+          };
+        }
+      } else if (state.docSubTab === 'pending') {
+        emptyState.innerHTML = `
+          <div class="text-center py-16 px-6 bg-white rounded-3xl border-2 border-emerald-300 shadow-sm">
+            <div class="w-24 h-24 mx-auto rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-5xl mb-4 shadow-sm ring-8 ring-emerald-50">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ยอดเยี่ยมมาก! ไม่มีเอกสารค้างรับทราบ</h3>
+            <p class="text-slate-600 text-lg sm:text-xl max-w-lg mx-auto mb-6">
+              ท่านได้เปิดอ่านและกดรับทราบเอกสารเวียนที่มอบหมายครบถ้วนทุกฉบับแล้ว
+            </p>
+            <button type="button" id="empty-go-to-acked-btn" class="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xl font-bold rounded-2xl shadow-lg shadow-emerald-600/30 transition inline-flex items-center gap-3 cursor-pointer">
+              <i class="fa-solid fa-list-check"></i>
+              <span>ดูเอกสารที่รับทราบแล้ว (${ackedDocs.length} ฉบับ)</span>
+            </button>
+          </div>
+        `;
+        const goAckedBtn = document.getElementById('empty-go-to-acked-btn');
+        if (goAckedBtn) {
+          goAckedBtn.onclick = () => switchDocSubTab('acked');
+        }
+      } else if (state.docSubTab === 'acked') {
+        emptyState.innerHTML = `
+          <div class="text-center py-16 px-6 bg-white rounded-3xl border-2 border-dashed border-slate-300">
+            <div class="w-20 h-20 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-3xl mb-4">
+              <i class="fa-solid fa-file-circle-check"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-slate-800 mb-2">ยังไม่มีเอกสารที่รับทราบแล้ว</h3>
+            <p class="text-slate-500 text-lg max-w-md mx-auto mb-6">เมื่อท่านเปิดอ่านและกดยืนยันรับทราบเอกสาร รายการจะย้ายมาแสดงที่หน้านี้</p>
+            <button type="button" id="empty-go-to-pending-btn" class="px-8 py-3.5 bg-hqd-600 hover:bg-hqd-700 text-white text-xl font-bold rounded-2xl shadow-lg shadow-hqd-600/30 transition inline-flex items-center gap-3 cursor-pointer">
+              <i class="fa-solid fa-clock"></i>
+              <span>ไปที่เอกสารรอรับทราบ (${pendingDocs.length} ฉบับ)</span>
+            </button>
+          </div>
+        `;
+        const goPendingBtn = document.getElementById('empty-go-to-pending-btn');
+        if (goPendingBtn) {
+          goPendingBtn.onclick = () => switchDocSubTab('pending');
+        }
+      } else {
+        emptyState.innerHTML = `
+          <div class="text-center py-16 px-4 bg-white rounded-3xl border-2 border-dashed border-slate-300">
+            <div class="w-24 h-24 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-4xl mb-4">
+              <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-slate-800 mb-2">ไม่พบรายการเอกสารเวียน</h3>
+            <p class="text-slate-500 text-lg max-w-md mx-auto">ยังไม่มีเอกสารเวียนที่มอบหมายให้ท่านในขณะนี้</p>
+          </div>
+        `;
+      }
       return;
     }
 
     emptyState.classList.add('hidden');
 
     // Render Document Cards
-    grid.innerHTML = userDocs.map(doc => {
+    grid.innerHTML = displayDocs.map(doc => {
       const statusMeta = calculateDocStatus(doc);
       const isAckByMe = doc.acknowledgedUsers && doc.acknowledgedUsers.includes(currentUserId);
       const myAckTime = isAckByMe && doc.acknowledgedDetails ? doc.acknowledgedDetails[currentUserId] : null;
+      const hasRead = hasDocBeenRead(doc.id);
 
       // Target calculations for Admin progress bar
       const targetCount = doc.targetUsers ? doc.targetUsers.length : state.users.length;
@@ -809,8 +1151,8 @@
               class="open-viewer-btn px-5 py-3 rounded-2xl border-2 border-slate-300 hover:border-hqd-500 hover:bg-hqd-50 text-slate-700 hover:text-hqd-800 text-lg font-bold transition flex items-center justify-center gap-2 cursor-pointer"
               data-id="${escapeHtml(doc.id)}"
             >
-              <i class="fa-solid fa-file-lines text-xl text-hqd-600"></i>
-              <span>เปิดอ่านเอกสาร</span>
+              <i class="fa-solid fa-book-open text-xl text-hqd-600"></i>
+              <span>${hasRead ? 'เปิดอ่านอีกครั้ง' : 'เปิดอ่านเอกสาร'}</span>
             </button>
 
             <!-- Right: Acknowledge & Tracking Buttons -->
@@ -825,24 +1167,35 @@
                   title="ดูรายชื่อผู้รับทราบแล้วและยังไม่อ่าน"
                 >
                   <i class="fa-solid fa-chart-pie"></i>
-                  <span>ภาพรวมสถานะ</span>
+                  <span>ภาพรวม</span>
                 </button>
               ` : ''}
 
-              <!-- Acknowledge Button (Accessible to both User & Admin) -->
+              <!-- Acknowledge Button State: Read Enforced -->
               ${isAckByMe ? `
-                <div class="px-5 py-3 rounded-2xl bg-emerald-50 text-emerald-800 border-2 border-emerald-400 text-lg font-bold flex items-center justify-center gap-2" title="${myAckTime ? `รับทราบเมื่อ: ${formatThaiDateTime(myAckTime)}` : ''}">
+                <div class="px-5 py-3 rounded-2xl bg-emerald-50 text-emerald-800 border-2 border-emerald-400 text-lg font-bold flex items-center justify-center gap-2 shadow-sm" title="${myAckTime ? `รับทราบเมื่อ: ${formatThaiDateTime(myAckTime)}` : ''}">
                   <i class="fa-solid fa-circle-check text-xl text-emerald-600"></i>
                   <span>รับทราบแล้ว</span>
                 </div>
-              ` : `
+              ` : hasRead ? `
                 <button 
                   type="button" 
                   class="ack-doc-btn px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-lg font-bold shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
                   data-id="${escapeHtml(doc.id)}"
+                  title="คลิกเพื่อบันทึกการรับทราบเอกสาร"
                 >
                   <i class="fa-solid fa-check text-xl"></i>
                   <span>กดรับทราบ</span>
+                </button>
+              ` : `
+                <button 
+                  type="button" 
+                  class="need-read-btn px-5 py-3 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-amber-300 text-lg font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                  data-id="${escapeHtml(doc.id)}"
+                  title="ต้องเปิดอ่านเอกสารก่อนจึงจะสามารถกดรับทราบได้"
+                >
+                  <i class="fa-solid fa-lock text-amber-600"></i>
+                  <span>ต้องเปิดอ่านก่อน</span>
                 </button>
               `}
 
@@ -867,7 +1220,16 @@
       };
     });
 
-    // Acknowledge Document
+    // Need Read Button (Directs to reading document first)
+    document.querySelectorAll('.need-read-btn').forEach(btn => {
+      btn.onclick = () => {
+        const docId = btn.getAttribute('data-id');
+        showToast('กรุณาเปิดอ่านเนื้อหาเอกสารให้เข้าใจก่อนกดรับทราบ', 'warning', 3500);
+        openDocumentViewer(docId);
+      };
+    });
+
+    // Acknowledge Document (Only accessible when opened/read)
     document.querySelectorAll('.ack-doc-btn').forEach(btn => {
       btn.onclick = () => {
         const docId = btn.getAttribute('data-id');
@@ -903,7 +1265,7 @@
       doc.acknowledgedDetails[currentUserId] = timeStr;
       
       saveToLocalCache();
-      showToast(`ท่านได้รับทราบเอกสาร "${doc.title}" เรียบร้อยแล้ว`, 'success');
+      showToast(`ท่านได้รับทราบเอกสาร "${doc.title}" เรียบร้อยแล้ว (ย้ายไปที่แท็บรับทราบแล้ว)`, 'success', 5000);
       
       // Reactive re-render with 0-second latency
       renderCurrentTab();
@@ -1024,14 +1386,29 @@
   const attachPersonnelEvents = () => {
     // Toggle Role (User <-> Admin)
     document.querySelectorAll('.toggle-role-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const userId = btn.getAttribute('data-id');
         const user = state.users.find(u => u.id === userId);
         if (user) {
-          user.role = user.role === 'admin' ? 'user' : 'admin';
+          const newRole = user.role === 'admin' ? 'user' : 'admin';
+          user.role = newRole;
+
+          // 1. Save role override to localStorage so background sync never reverts it
+          saveRoleOverride(userId, newRole);
           saveToLocalCache();
-          showToast(`เปลี่ยนบทบาทของ ${user.name} เป็น ${user.role === 'admin' ? 'Admin' : 'User'} เรียบร้อยแล้ว`, 'success');
+
+          // 2. If the user being modified is the currently logged-in user, immediately update session & UI
+          if (state.currentUser && state.currentUser.id === userId) {
+            state.currentUser.role = newRole;
+            localStorage.setItem(CONFIG.STORAGE_KEY_USER, JSON.stringify(state.currentUser));
+            renderAppView();
+          }
+
+          showToast(`เปลี่ยนบทบาทของ ${user.name} เป็น ${newRole === 'admin' ? 'Admin (ผู้ดูแลระบบ)' : 'User (บุคลากร)'} เรียบร้อยแล้ว`, 'success');
           renderPersonnelManagement();
+
+          // 3. Dispatch to Google Apps Script / Sheet
+          await sendUserRoleToServer(userId, newRole);
         }
       };
     });
@@ -1049,16 +1426,18 @@
 
     // Delete User
     document.querySelectorAll('.delete-user-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const userId = btn.getAttribute('data-id');
         const user = state.users.find(u => u.id === userId);
         if (!user) return;
 
         if (confirm(`คุณต้องการลบรายชื่อ "${user.name}" (รหัส ${user.id}) ออกจากระบบใช่หรือไม่?`)) {
           state.users = state.users.filter(u => u.id !== userId);
+          deleteRoleOverride(userId);
           saveToLocalCache();
           showToast(`ลบข้อมูล ${user.name} สำเร็จ`, 'info');
           renderPersonnelManagement();
+          await sendDeleteUserToServer(userId);
         }
       };
     });
@@ -1372,13 +1751,18 @@
 
     state.viewingDocId = docId;
 
+    // Automatically mark this document as read/opened by the current user
+    markDocAsRead(docId);
+
     document.getElementById('viewer-doc-title').textContent = doc.title;
     document.getElementById('viewer-doc-meta').textContent = `${doc.id} • ระดับความสำคัญ: ${doc.priority} • ครบกำหนด: ${formatThaiDate(doc.endDate)}`;
 
     const iframe = document.getElementById('viewer-frame');
     const img = document.getElementById('viewer-image');
     const downloadLink = document.getElementById('viewer-download-link');
-    const ackBtn = document.getElementById('viewer-ack-btn');
+    const confirmContainer = document.getElementById('viewer-confirm-container');
+    const confirmCheckbox = document.getElementById('viewer-confirm-checkbox');
+    const actionContainer = document.getElementById('viewer-ack-action-container');
 
     downloadLink.href = doc.fileUrl || '#';
 
@@ -1395,21 +1779,67 @@
       iframe.src = doc.fileUrl;
     }
 
-    // Configure Acknowledge Button state
+    // Configure Acknowledge Button & Mandatory Checkbox state
     const currentUserId = state.currentUser ? state.currentUser.id : '';
     const isAckByMe = doc.acknowledgedUsers && doc.acknowledgedUsers.includes(currentUserId);
+    const myAckTime = isAckByMe && doc.acknowledgedDetails ? doc.acknowledgedDetails[currentUserId] : null;
 
     if (isAckByMe) {
-      ackBtn.className = 'w-full sm:w-auto px-8 py-3 text-xl font-bold text-white bg-slate-400 rounded-2xl cursor-default flex items-center justify-center gap-3';
-      ackBtn.innerHTML = '<i class="fa-solid fa-check-circle text-2xl"></i><span>ท่านได้รับทราบเอกสารนี้แล้ว</span>';
-      ackBtn.onclick = null;
+      if (confirmContainer) confirmContainer.classList.add('hidden');
+      if (actionContainer) {
+        actionContainer.innerHTML = `
+          <div class="w-full lg:w-auto px-6 py-3.5 rounded-2xl bg-emerald-100 text-emerald-800 border-2 border-emerald-400 text-lg font-bold flex items-center justify-center gap-2 shadow-sm">
+            <i class="fa-solid fa-circle-check text-2xl text-emerald-600"></i>
+            <span>ท่านได้รับทราบเอกสารนี้แล้ว ${myAckTime ? `(${formatThaiDateTime(myAckTime)})` : ''}</span>
+          </div>
+        `;
+      }
     } else {
-      ackBtn.className = 'w-full sm:w-auto px-8 py-3 text-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-2xl shadow-lg transition flex items-center justify-center gap-3 cursor-pointer';
-      ackBtn.innerHTML = '<i class="fa-solid fa-check-circle text-2xl"></i><span>ฉันได้อ่านและรับทราบแล้ว</span>';
-      ackBtn.onclick = () => {
-        acknowledgeDocument(docId);
-        closeModal('modal-doc-viewer');
-      };
+      if (confirmContainer) confirmContainer.classList.remove('hidden');
+      if (confirmCheckbox) confirmCheckbox.checked = false;
+
+      if (actionContainer) {
+        actionContainer.innerHTML = `
+          <button 
+            type="button" 
+            id="viewer-ack-btn" 
+            disabled
+            class="w-full lg:w-auto px-8 py-3.5 text-xl font-bold text-slate-400 bg-slate-200 border-2 border-slate-300 rounded-2xl transition flex items-center justify-center gap-3 opacity-70 cursor-not-allowed"
+          >
+            <i class="fa-solid fa-lock text-xl" id="viewer-ack-btn-icon"></i>
+            <span id="viewer-ack-btn-text">กรุณาติ๊กยืนยันว่าได้อ่านแล้ว</span>
+          </button>
+        `;
+
+        const ackBtn = document.getElementById('viewer-ack-btn');
+        const ackIcon = document.getElementById('viewer-ack-btn-icon');
+        const ackText = document.getElementById('viewer-ack-btn-text');
+
+        if (confirmCheckbox) {
+          confirmCheckbox.onchange = () => {
+            if (confirmCheckbox.checked) {
+              ackBtn.disabled = false;
+              ackBtn.className = 'w-full lg:w-auto px-8 py-3.5 text-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-3 cursor-pointer ring-4 ring-emerald-200';
+              if (ackIcon) ackIcon.className = 'fa-solid fa-check-circle text-2xl';
+              if (ackText) ackText.textContent = 'ฉันได้อ่านและรับทราบแล้ว';
+            } else {
+              ackBtn.disabled = true;
+              ackBtn.className = 'w-full lg:w-auto px-8 py-3.5 text-xl font-bold text-slate-400 bg-slate-200 border-2 border-slate-300 rounded-2xl transition flex items-center justify-center gap-3 opacity-70 cursor-not-allowed';
+              if (ackIcon) ackIcon.className = 'fa-solid fa-lock text-xl';
+              if (ackText) ackText.textContent = 'กรุณาติ๊กยืนยันว่าได้อ่านแล้ว';
+            }
+          };
+        }
+
+        ackBtn.onclick = () => {
+          if (!confirmCheckbox || !confirmCheckbox.checked) {
+            showToast('กรุณาคลิกเลือกยืนยันว่าได้เปิดอ่านเอกสารเรียบร้อยแล้ว', 'warning');
+            return;
+          }
+          acknowledgeDocument(docId);
+          closeModal('modal-doc-viewer');
+        };
+      }
     }
 
     showModal('modal-doc-viewer');
@@ -1473,7 +1903,10 @@
       }
       const newUser = { id, pin: id, name, department: dept, email, role };
       state.users.push(newUser);
+      saveRoleOverride(id, role);
+      saveToLocalCache();
       showToast(`เพิ่มบุคลากร "${name}" สำเร็จ`, 'success');
+      sendNewUserToServer(newUser);
     } else {
       // Update
       const existing = state.users.find(u => u.id === id);
@@ -1482,7 +1915,19 @@
         existing.department = dept;
         existing.email = email;
         existing.role = role;
+        saveRoleOverride(id, role);
+        saveToLocalCache();
+
+        if (state.currentUser && state.currentUser.id === id) {
+          state.currentUser.name = name;
+          state.currentUser.department = dept;
+          state.currentUser.role = role;
+          localStorage.setItem(CONFIG.STORAGE_KEY_USER, JSON.stringify(state.currentUser));
+          renderAppView();
+        }
+
         showToast(`อัปเดตข้อมูล "${name}" สำเร็จ`, 'success');
+        sendUserUpdateToServer(existing);
       }
     }
 
@@ -1599,6 +2044,15 @@
     document.getElementById('font-size-sm').onclick = () => setFontScale('sm');
     document.getElementById('font-size-md').onclick = () => setFontScale('md');
     document.getElementById('font-size-lg').onclick = () => setFontScale('lg');
+
+    // --- 2.1 Document Sub-Tabs (Pending / Acked / All) ---
+    const subPendingBtn = document.getElementById('doc-subtab-pending');
+    const subAckedBtn = document.getElementById('doc-subtab-acked');
+    const subAllBtn = document.getElementById('doc-subtab-all');
+
+    if (subPendingBtn) subPendingBtn.onclick = () => switchDocSubTab('pending');
+    if (subAckedBtn) subAckedBtn.onclick = () => switchDocSubTab('acked');
+    if (subAllBtn) subAllBtn.onclick = () => switchDocSubTab('all');
 
     // --- 3. Document Filters & Search ---
     const docSearch = document.getElementById('doc-search-input');

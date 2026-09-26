@@ -335,6 +335,52 @@
 
             </div>
 
+            <!-- ==================== DOCUMENT VIEW SUB-TABS (Elder-Friendly Separation) ==================== -->
+            <div class="pt-4 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div class="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5 bg-slate-100 rounded-2xl border-2 border-slate-200">
+                
+                <!-- Subtab 1: รอฉันรับทราบ (ยังไม่อ่าน - Default for Users) -->
+                <button 
+                  type="button" 
+                  id="doc-subtab-pending" 
+                  class="doc-subtab active px-5 py-3 rounded-xl font-bold text-lg flex items-center gap-2.5 transition cursor-pointer"
+                >
+                  <i class="fa-solid fa-clock text-amber-500"></i>
+                  <span>รอฉันรับทราบ (ยังไม่อ่าน)</span>
+                  <span id="badge-subtab-pending" class="px-2.5 py-0.5 text-sm rounded-full bg-amber-100 text-amber-900 font-bold">0</span>
+                </button>
+
+                <!-- Subtab 2: รับทราบแล้ว (อ่านแล้ว) -->
+                <button 
+                  type="button" 
+                  id="doc-subtab-acked" 
+                  class="doc-subtab px-5 py-3 rounded-xl font-bold text-lg flex items-center gap-2.5 transition cursor-pointer"
+                >
+                  <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                  <span>รับทราบแล้ว (อ่านแล้ว)</span>
+                  <span id="badge-subtab-acked" class="px-2.5 py-0.5 text-sm rounded-full bg-emerald-100 text-emerald-900 font-bold">0</span>
+                </button>
+
+                <!-- Subtab 3: เอกสารทั้งหมด -->
+                <button 
+                  type="button" 
+                  id="doc-subtab-all" 
+                  class="doc-subtab px-5 py-3 rounded-xl font-bold text-lg flex items-center gap-2.5 transition cursor-pointer"
+                >
+                  <i class="fa-solid fa-layer-group text-slate-500"></i>
+                  <span>เอกสารทั้งหมด</span>
+                  <span id="badge-subtab-all" class="px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-800 font-bold">0</span>
+                </button>
+
+              </div>
+
+              <!-- Elder-Friendly Active View Description -->
+              <div class="text-slate-600 text-base flex items-center gap-2 px-1">
+                <i class="fa-solid fa-circle-info text-hqd-600 text-lg"></i>
+                <span id="doc-subtab-hint" class="font-medium">แสดงเฉพาะเอกสารที่ท่านยังไม่ได้กดรับทราบ</span>
+              </div>
+            </div>
+
             <!-- Filters Bar (Search, Status Filter, Priority Filter) -->
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 pt-4 border-t border-slate-100">
               
@@ -355,12 +401,11 @@
                   id="doc-status-filter" 
                   class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800"
                 >
-                  <option value="all">สถานะทั้งหมด</option>
-                  <option value="pending">รอฉันรับทราบ</option>
-                  <option value="acknowledged">ฉันรับทราบแล้ว</option>
+                  <option value="all">สถานะความเร่งด่วนทั้งหมด</option>
                   <option value="glow-yellow">🟡 ใกล้ครบกำหนด (ใน 3 วัน)</option>
                   <option value="glow-red">🔴 เกินกำหนด (Overdue)</option>
                   <option value="glow-green">🟢 รับทราบครบ 100%</option>
+                  <option value="glow-none">⚪ ปกติ</option>
                 </select>
               </div>
 
@@ -387,13 +432,9 @@
             <!-- Dynamic Document Cards will be rendered here by app.js -->
           </div>
 
-          <!-- Empty State (No documents found) -->
-          <div id="docs-empty-state" class="hidden text-center py-16 px-4 bg-white rounded-3xl border-2 border-dashed border-slate-300">
-            <div class="w-24 h-24 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-4xl mb-4">
-              <i class="fa-solid fa-folder-open"></i>
-            </div>
-            <h3 class="text-2xl font-bold text-slate-800 mb-2">ไม่พบรายการเอกสารเวียน</h3>
-            <p class="text-slate-500 text-lg max-w-md mx-auto">ไม่มีเอกสารที่ตรงกับเงื่อนไขการค้นหา หรือยังไม่มีเอกสารเวียนที่มอบหมายให้ท่านในขณะนี้</p>
+          <!-- Empty State Container (Dynamic for Pending / Acked / Search) -->
+          <div id="docs-empty-state" class="hidden">
+            <!-- Rendered dynamically by app.js -->
           </div>
 
         </section>
@@ -965,20 +1006,35 @@
         <img id="viewer-image" class="hidden max-h-full max-w-full object-contain rounded-2xl shadow" alt="เอกสารแนบ" />
       </div>
 
-      <!-- Viewer Footer with Immediate Acknowledge Button -->
-      <div class="px-6 py-4 border-t-2 border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="text-base text-slate-600 flex items-center gap-2">
-          <i class="fa-solid fa-shield-halved text-hqd-600"></i>
-          <span>การกด "รับทราบ" ถือว่าท่านได้อ่านและเข้าใจเนื้อหาในประกาศนี้เรียบร้อยแล้ว</span>
+      <!-- Viewer Footer with Mandatory Read Confirmation & Acknowledge Action -->
+      <div class="px-6 py-4 border-t-2 border-slate-200 bg-slate-50 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        
+        <!-- Confirmation Checkbox (Required before acknowledging) -->
+        <label id="viewer-confirm-container" class="flex items-center gap-3 p-3.5 rounded-2xl bg-white border-2 border-slate-300 hover:border-emerald-500 cursor-pointer transition select-none shadow-sm flex-1">
+          <input 
+            type="checkbox" 
+            id="viewer-confirm-checkbox" 
+            class="w-7 h-7 text-emerald-600 rounded-lg focus:ring-emerald-500 cursor-pointer"
+          />
+          <span class="text-lg sm:text-xl font-bold text-slate-800">
+            <i class="fa-solid fa-book-open-reader text-emerald-600 mr-1.5"></i>
+            ข้าพเจ้าได้เปิดอ่านและเข้าใจสาระสำคัญของเอกสารนี้เรียบร้อยแล้ว <span class="text-rose-500">*</span>
+          </span>
+        </label>
+        
+        <!-- Action Button Container -->
+        <div id="viewer-ack-action-container" class="flex-shrink-0 flex items-center justify-end">
+          <button 
+            type="button" 
+            id="viewer-ack-btn" 
+            disabled
+            class="w-full lg:w-auto px-8 py-3.5 text-xl font-bold text-slate-400 bg-slate-200 border-2 border-slate-300 rounded-2xl transition flex items-center justify-center gap-3 opacity-70 cursor-not-allowed"
+          >
+            <i class="fa-solid fa-lock text-xl" id="viewer-ack-btn-icon"></i>
+            <span id="viewer-ack-btn-text">กรุณาติ๊กยืนยันว่าได้อ่านแล้ว</span>
+          </button>
         </div>
-        <button 
-          type="button" 
-          id="viewer-ack-btn" 
-          class="w-full sm:w-auto px-8 py-3 text-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-2xl shadow-lg transition flex items-center justify-center gap-3 cursor-pointer"
-        >
-          <i class="fa-solid fa-check-circle text-2xl"></i>
-          <span>ฉันได้อ่านและรับทราบแล้ว</span>
-        </button>
+
       </div>
 
     </div>
