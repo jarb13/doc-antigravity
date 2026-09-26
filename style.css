@@ -261,6 +261,26 @@ button, input, select, textarea {
   }
 }
 
+/* Priority Badges - 3 Distinct Levels (Elder-Friendly & High Contrast) */
+.priority-badge-normal {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 2px solid #6ee7b7 !important;
+}
+
+.priority-badge-urgent {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border: 2px solid #fcd34d !important;
+}
+
+.priority-badge-most-urgent {
+  background-color: #fff1f2 !important;
+  color: #9f1239 !important;
+  border: 2px solid #f87171 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3) !important;
+}
+
 /* Print Styles */
 @media print {
   header, nav, #toast-container, .modal-overlay, button {

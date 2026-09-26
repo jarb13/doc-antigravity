@@ -85,7 +85,7 @@
       fileUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
       fileName: "risk_management_q3.pdf",
       fileMime: "application/pdf",
-      priority: "ด่วนมาก",
+      priority: "ด่วน",
       startDate: "2026-09-10",
       endDate: "2026-09-24", // Already passed deadline -> 🔴 Glow Red
       targetType: "all",
@@ -277,9 +277,9 @@
       return {
         glowClass: 'glow-green',
         statusKey: 'glow-green',
-        badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-        dotColor: 'bg-emerald-500 shadow-[0_0_8px_#22c55e]',
-        text: 'รับทราบครบทุกคนแล้ว (100%)',
+        badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+        iconHtml: '<i class="fa-solid fa-circle-check text-emerald-600"></i>',
+        text: 'รับทราบครบ 100%',
         is100Percent: true,
         daysRemaining: null
       };
@@ -300,9 +300,9 @@
       return {
         glowClass: 'glow-red',
         statusKey: 'glow-red',
-        badgeColor: 'bg-rose-100 text-rose-800 border-rose-300',
-        dotColor: 'bg-rose-500 shadow-[0_0_8px_#ef4444]',
-        text: `เกินกำหนดแล้ว (${Math.abs(diffDays)} วัน) - มีผู้ยังไม่อ่าน`,
+        badgeColor: 'bg-rose-50 text-rose-800 border-rose-300',
+        iconHtml: '<i class="fa-solid fa-circle-exclamation text-rose-600"></i>',
+        text: `เกินกำหนด (${Math.abs(diffDays)} วัน)`,
         is100Percent: false,
         daysRemaining: diffDays
       };
@@ -313,9 +313,9 @@
       return {
         glowClass: 'glow-yellow',
         statusKey: 'glow-yellow',
-        badgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
-        dotColor: 'bg-amber-500 shadow-[0_0_8px_#f59e0b]',
-        text: diffDays === 0 ? 'ครบกำหนดวันนี้!' : `ใกล้ครบกำหนด (เหลือ ${diffDays} วัน)`,
+        badgeColor: 'bg-amber-50 text-amber-900 border-amber-300',
+        iconHtml: '<i class="fa-solid fa-clock text-amber-600"></i>',
+        text: diffDays === 0 ? 'ครบกำหนดวันนี้!' : `ใกล้ครบกำหนด (${diffDays} วัน)`,
         is100Percent: false,
         daysRemaining: diffDays
       };
@@ -326,8 +326,8 @@
       glowClass: 'glow-none',
       statusKey: 'glow-none',
       badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
-      dotColor: 'bg-slate-400',
-      text: `เหลือเวลาอีก ${diffDays} วัน`,
+      iconHtml: '<i class="fa-solid fa-calendar text-slate-500"></i>',
+      text: `เหลือเวลา ${diffDays} วัน`,
       is100Percent: false,
       daysRemaining: diffDays
     };
@@ -536,7 +536,52 @@
           }
           // Reconcile Documents if server has docs
           if (Array.isArray(result.data.docs) && result.data.docs.length > 0) {
-            state.documents = result.data.docs;
+            const serverDocs = result.data.docs.map(d => {
+              const targetAud = String(d.targetAudience || d.targetType || 'all').trim();
+              const isAll = targetAud.toLowerCase() === 'all';
+              const targetUsers = Array.isArray(d.targetUsers) && d.targetUsers.length > 0
+                ? d.targetUsers 
+                : (isAll ? state.users.map(u => u.id) : targetAud.split(',').map(s => s.trim()).filter(Boolean));
+              
+              let ackUsers = [];
+              if (Array.isArray(d.acknowledgedUsers)) ackUsers = d.acknowledgedUsers;
+              else if (Array.isArray(d.readStatus)) ackUsers = d.readStatus;
+              else if (typeof d.readStatus === 'string' && d.readStatus) ackUsers = d.readStatus.split(',').map(s => s.trim()).filter(Boolean);
+              else if (typeof d.acknowledgedUsers === 'string' && d.acknowledgedUsers) ackUsers = d.acknowledgedUsers.split(',').map(s => s.trim()).filter(Boolean);
+
+              let cleanTitle = String(d.title || '').trim();
+              let fileUrl = d.fileUrl || '';
+              const linkMatch = cleanTitle.match(/\((https?:\/\/[^)]+)\)/);
+              if (linkMatch && !fileUrl) {
+                fileUrl = linkMatch[1];
+                cleanTitle = cleanTitle.replace(/\s*\((https?:\/\/[^)]+)\)/, '').trim();
+              }
+
+              let priority = String(d.priority || d.urgencyLevel || 'ปกติ').trim();
+              if (priority === 'ด่วนมาก') priority = 'ด่วน';
+              if (!['ปกติ', 'ด่วน', 'ด่วนที่สุด'].includes(priority)) priority = 'ปกติ';
+
+              return {
+                id: String(d.id).trim(),
+                title: cleanTitle || 'เอกสารเวียน',
+                fileUrl: fileUrl,
+                fileName: d.fileName || 'document.pdf',
+                fileMime: d.fileMime || 'application/pdf',
+                priority: priority,
+                startDate: String(d.startDate || '').split('T')[0],
+                endDate: String(d.endDate || '').split('T')[0],
+                targetType: isAll ? 'all' : 'specific',
+                targetUsers: targetUsers,
+                acknowledgedUsers: ackUsers,
+                acknowledgedDetails: d.acknowledgedDetails || {},
+                createdAt: d.createdAt ? (typeof d.createdAt === 'number' ? new Date(d.createdAt).toISOString() : String(d.createdAt)) : new Date().toISOString()
+              };
+            });
+
+            // Merge with local state documents to ensure newly created ones are never lost
+            const existingIds = new Set(serverDocs.map(d => d.id));
+            const localOnlyDocs = state.documents.filter(d => !existingIds.has(d.id));
+            state.documents = [...localOnlyDocs, ...serverDocs];
           }
 
           syncCurrentUserWithList();
@@ -723,17 +768,21 @@
    */
   const sendNewDocumentToServer = async (docData) => {
     try {
+      const targetAudience = docData.targetType === 'all' ? 'All' : (docData.targetUsers || []).join(',');
       const payload = {
         action: 'addDocument',
         data: {
           title: docData.title,
           priority: docData.priority,
+          urgencyLevel: docData.priority,
           startDate: docData.startDate,
           endDate: docData.endDate,
           targetType: docData.targetType,
           targetUsers: docData.targetUsers,
-          fileName: docData.fileName,
-          fileBase64: docData.fileBase64,
+          targetAudience: targetAudience,
+          fileName: docData.fileName || 'document.pdf',
+          fileBase64: docData.fileBase64 || '',
+          fileUrl: docData.fileUrl || '',
           createdBy: state.currentUser ? state.currentUser.id : '',
           creatorName: state.currentUser ? state.currentUser.name : ''
         }
@@ -747,7 +796,7 @@
       });
       return true;
     } catch (err) {
-      console.warn('Drive 302 Redirect / Network warning intercepted:', err);
+      console.warn('sendNewDocumentToServer note:', err);
       return true;
     }
   };
@@ -1072,11 +1121,21 @@
       const ackCount = doc.acknowledgedUsers ? doc.acknowledgedUsers.length : 0;
       const percent = Math.min(100, Math.round((ackCount / (targetCount || 1)) * 100));
 
-      // Priority Badge Color
-      let priorityClass = 'bg-slate-100 text-slate-800 border-slate-300';
-      if (doc.priority === 'ด่วนที่สุด') priorityClass = 'bg-rose-100 text-rose-800 border-rose-300';
-      else if (doc.priority === 'ด่วนมาก') priorityClass = 'bg-orange-100 text-orange-800 border-orange-300';
-      else if (doc.priority === 'ด่วน') priorityClass = 'bg-amber-100 text-amber-800 border-amber-300';
+      // Priority Badge: Only 3 levels with distinct Elder-Friendly High-Contrast styling
+      // ปกติ: สีเขียวอ่อน | ด่วน: สีส้ม | ด่วนที่สุด: สีแดง
+      let priorityClass = 'priority-badge-normal';
+      let priorityIcon = '<i class="fa-solid fa-circle-check mr-1.5 text-emerald-600"></i>';
+      let priorityText = 'ปกติ';
+
+      if (doc.priority === 'ด่วนที่สุด') {
+        priorityClass = 'priority-badge-most-urgent';
+        priorityIcon = '<i class="fa-solid fa-triangle-exclamation mr-1.5 text-rose-600"></i>';
+        priorityText = 'ด่วนที่สุด';
+      } else if (doc.priority === 'ด่วน' || doc.priority === 'ด่วนมาก') {
+        priorityClass = 'priority-badge-urgent';
+        priorityIcon = '<i class="fa-solid fa-bell mr-1.5 text-amber-600"></i>';
+        priorityText = 'ด่วน';
+      }
 
       return `
         <article class="doc-card ${statusMeta.glowClass} bg-white rounded-3xl p-6 sm:p-8 border-2 transition-all flex flex-col justify-between">
@@ -1088,14 +1147,14 @@
                 <span class="px-3 py-1 rounded-xl text-base font-bold bg-slate-100 text-slate-700 border border-slate-300">
                   ${escapeHtml(doc.id)}
                 </span>
-                <span class="px-3 py-1 rounded-xl text-base font-bold border ${priorityClass}">
-                  <i class="fa-solid fa-flag mr-1 text-sm"></i>${escapeHtml(doc.priority || 'ปกติ')}
+                <span class="px-3.5 py-1 rounded-xl text-base font-bold ${priorityClass}">
+                  ${priorityIcon}${escapeHtml(priorityText)}
                 </span>
               </div>
 
-              <!-- Status Glow Badge -->
-              <span class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-base font-semibold border ${statusMeta.badgeColor}">
-                <span class="w-3 h-3 rounded-full ${statusMeta.dotColor}"></span>
+              <!-- Status Glow Badge: ONE single colored icon per status, no duplicate dots -->
+              <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-base font-bold border ${statusMeta.badgeColor}">
+                ${statusMeta.iconHtml}
                 <span>${escapeHtml(statusMeta.text)}</span>
               </span>
             </div>
@@ -1443,23 +1502,61 @@
     });
   };
 
-  /* ==========================================================================
-     11. MODAL: CREATE DOCUMENT (ADMIN)
-     ========================================================================== */
+  const setupDateSelects = () => {
+    const startDay = document.getElementById('doc-form-start-day');
+    const endDay = document.getElementById('doc-form-end-day');
+    if (!startDay || !endDay) return;
+
+    if (startDay.options.length === 0) {
+      let daysHtml = '';
+      for (let i = 1; i <= 31; i++) {
+        const val = String(i).padStart(2, '0');
+        daysHtml += `<option value="${val}">${i}</option>`;
+      }
+      startDay.innerHTML = daysHtml;
+      endDay.innerHTML = daysHtml;
+
+      const syncFromSelects = () => {
+        const sy = document.getElementById('doc-form-start-year').value;
+        const sm = document.getElementById('doc-form-start-month').value;
+        const sd = document.getElementById('doc-form-start-day').value;
+        document.getElementById('doc-form-start-date').value = `${sy}-${sm}-${sd}`;
+
+        const ey = document.getElementById('doc-form-end-year').value;
+        const em = document.getElementById('doc-form-end-month').value;
+        const ed = document.getElementById('doc-form-end-day').value;
+        document.getElementById('doc-form-end-date').value = `${ey}-${em}-${ed}`;
+      };
+
+      ['doc-form-start-day', 'doc-form-start-month', 'doc-form-start-year',
+       'doc-form-end-day', 'doc-form-end-month', 'doc-form-end-year'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', syncFromSelects);
+      });
+    }
+
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + 7);
+
+    document.getElementById('doc-form-start-day').value = String(today.getDate()).padStart(2, '0');
+    document.getElementById('doc-form-start-month').value = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('doc-form-start-year').value = String(today.getFullYear());
+    document.getElementById('doc-form-start-date').value = today.toISOString().split('T')[0];
+
+    document.getElementById('doc-form-end-day').value = String(nextWeek.getDate()).padStart(2, '0');
+    document.getElementById('doc-form-end-month').value = String(nextWeek.getMonth() + 1).padStart(2, '0');
+    document.getElementById('doc-form-end-year').value = String(nextWeek.getFullYear());
+    document.getElementById('doc-form-end-date').value = nextWeek.toISOString().split('T')[0];
+  };
+
   const openCreateDocModal = () => {
     const modal = document.getElementById('modal-create-doc');
     const form = document.getElementById('create-doc-form');
     form.reset();
 
-    // Default dates: Today & 7 days from now
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const nextWeek = new Date();
-    nextWeek.setDate(today.getDate() + 7);
-    const nextWeekStr = nextWeek.toISOString().split('T')[0];
-
-    document.getElementById('doc-form-start-date').value = todayStr;
-    document.getElementById('doc-form-end-date').value = nextWeekStr;
+    // Setup Day-Month-Year selects (วัน เดือน ปี พ.ศ.)
+    setupDateSelects();
 
     // Reset file preview
     state.selectedCreateFile = null;
@@ -1669,10 +1766,10 @@
       `;
     } else {
       ackContainer.innerHTML = ackUsers.map(u => `
-        <div class="flex items-center justify-between p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200">
+        <div class="flex items-center justify-between p-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-emerald-300 transition">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg">
-              <i class="fa-solid fa-check"></i>
+            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
+              <i class="fa-solid fa-user"></i>
             </div>
             <div>
               <div class="font-bold text-slate-900 text-lg">${escapeHtml(u.name)}</div>
@@ -1680,8 +1777,9 @@
             </div>
           </div>
           <div class="text-right">
-            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
-              รับทราบแล้ว
+            <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-base font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i>
+              <span>รับทราบแล้ว</span>
             </span>
             <div class="text-xs text-slate-500 mt-1">${u.ackTime ? formatThaiDateTime(u.ackTime) : '-'}</div>
           </div>
@@ -1700,18 +1798,19 @@
       `;
     } else {
       pendingContainer.innerHTML = pendingUsers.map(u => `
-        <div class="flex items-center justify-between p-4 rounded-2xl bg-rose-50/50 border border-rose-200">
+        <div class="flex items-center justify-between p-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-rose-300 transition">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center font-bold text-lg">
-              <i class="fa-solid fa-clock"></i>
+            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
+              <i class="fa-solid fa-user"></i>
             </div>
             <div>
               <div class="font-bold text-slate-900 text-lg">${escapeHtml(u.name)}</div>
               <div class="text-sm text-slate-500">${escapeHtml(u.department || '')} • รหัส ${escapeHtml(u.id)}</div>
             </div>
           </div>
-          <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-rose-100 text-rose-800 border border-rose-300">
-            ยังไม่อ่าน
+          <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-base font-bold bg-rose-100 text-rose-800 border border-rose-300">
+            <i class="fa-solid fa-clock text-rose-600"></i>
+            <span>ยังไม่อ่าน</span>
           </span>
         </div>
       `).join('');

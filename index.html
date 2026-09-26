@@ -347,7 +347,7 @@
                 >
                   <i class="fa-solid fa-clock text-amber-500"></i>
                   <span>รอฉันรับทราบ (ยังไม่อ่าน)</span>
-                  <span id="badge-subtab-pending" class="px-2.5 py-0.5 text-sm rounded-full bg-amber-100 text-amber-900 font-bold">0</span>
+                  <span id="badge-subtab-pending" class="px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-800 font-bold">0</span>
                 </button>
 
                 <!-- Subtab 2: รับทราบแล้ว (อ่านแล้ว) -->
@@ -358,7 +358,7 @@
                 >
                   <i class="fa-solid fa-circle-check text-emerald-600"></i>
                   <span>รับทราบแล้ว (อ่านแล้ว)</span>
-                  <span id="badge-subtab-acked" class="px-2.5 py-0.5 text-sm rounded-full bg-emerald-100 text-emerald-900 font-bold">0</span>
+                  <span id="badge-subtab-acked" class="px-2.5 py-0.5 text-sm rounded-full bg-slate-200 text-slate-800 font-bold">0</span>
                 </button>
 
                 <!-- Subtab 3: เอกสารทั้งหมด -->
@@ -413,13 +413,12 @@
               <div class="md:col-span-3">
                 <select 
                   id="doc-priority-filter" 
-                  class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800"
+                  class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold"
                 >
                   <option value="all">ความสำคัญทั้งหมด</option>
-                  <option value="ด่วนที่สุด">ด่วนที่สุด</option>
-                  <option value="ด่วนมาก">ด่วนมาก</option>
-                  <option value="ด่วน">ด่วน</option>
-                  <option value="ปกติ">ปกติ</option>
+                  <option value="ปกติ">🟢 ปกติ</option>
+                  <option value="ด่วน">🟠 ด่วน</option>
+                  <option value="ด่วนที่สุด">🔴 ด่วนที่สุด</option>
                 </select>
               </div>
 
@@ -592,7 +591,7 @@
           <!-- Priority & Dates Row -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <!-- Priority -->
+            <!-- Priority (Only 3 levels: ปกติ, ด่วน, ด่วนที่สุด) -->
             <div>
               <label for="doc-form-priority" class="block font-bold text-slate-800 mb-2">
                 ระดับความสำคัญ <span class="text-rose-500">*</span>
@@ -600,39 +599,76 @@
               <select 
                 id="doc-form-priority" 
                 required 
-                class="w-full px-4 py-4 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white transition"
+                class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white transition font-semibold"
               >
-                <option value="ปกติ">ปกติ (Normal)</option>
-                <option value="ด่วน">ด่วน (Urgent)</option>
-                <option value="ด่วนมาก">ด่วนมาก (Very Urgent)</option>
-                <option value="ด่วนที่สุด">ด่วนที่สุด (Most Urgent)</option>
+                <option value="ปกติ">🟢 ปกติ (Normal)</option>
+                <option value="ด่วน">🟠 ด่วน (Urgent)</option>
+                <option value="ด่วนที่สุด">🔴 ด่วนที่สุด (Most Urgent)</option>
               </select>
             </div>
 
-            <!-- Start Date -->
+            <!-- Start Date (วัน เดือน ปี) -->
             <div>
-              <label for="doc-form-start-date" class="block font-bold text-slate-800 mb-2">
-                วันที่เริ่มสื่อสาร <span class="text-rose-500">*</span>
+              <label class="block font-bold text-slate-800 mb-2">
+                วันที่เริ่มสื่อสาร (วัน เดือน ปี) <span class="text-rose-500">*</span>
               </label>
-              <input 
-                type="date" 
-                id="doc-form-start-date" 
-                required 
-                class="w-full px-4 py-4 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none transition"
-              />
+              <div class="grid grid-cols-3 gap-2">
+                <select id="doc-form-start-day" class="px-2 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white font-semibold" title="วัน">
+                  <!-- Generated dynamically 1..31 -->
+                </select>
+                <select id="doc-form-start-month" class="px-2 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white font-semibold" title="เดือน">
+                  <option value="01">ม.ค.</option>
+                  <option value="02">ก.พ.</option>
+                  <option value="03">มี.ค.</option>
+                  <option value="04">เม.ย.</option>
+                  <option value="05">พ.ค.</option>
+                  <option value="06">มิ.ย.</option>
+                  <option value="07">ก.ค.</option>
+                  <option value="08">ส.ค.</option>
+                  <option value="09">ก.ย.</option>
+                  <option value="10">ต.ค.</option>
+                  <option value="11">พ.ย.</option>
+                  <option value="12">ธ.ค.</option>
+                </select>
+                <select id="doc-form-start-year" class="px-2 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white font-semibold" title="ปี พ.ศ.">
+                  <option value="2026">2569</option>
+                  <option value="2027">2570</option>
+                  <option value="2028">2571</option>
+                </select>
+              </div>
+              <input type="hidden" id="doc-form-start-date" value="2026-09-26" />
             </div>
 
-            <!-- End Date (Deadline) -->
+            <!-- End Date (Deadline) (วัน เดือน ปี) -->
             <div>
-              <label for="doc-form-end-date" class="block font-bold text-slate-800 mb-2">
-                วันที่สิ้นสุด (Deadline) <span class="text-rose-500">*</span>
+              <label class="block font-bold text-slate-800 mb-2">
+                วันที่สิ้นสุด (วัน เดือน ปี) <span class="text-rose-500">*</span>
               </label>
-              <input 
-                type="date" 
-                id="doc-form-end-date" 
-                required 
-                class="w-full px-4 py-4 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none transition"
-              />
+              <div class="grid grid-cols-3 gap-2">
+                <select id="doc-form-end-day" class="px-2 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white font-semibold" title="วัน">
+                  <!-- Generated dynamically 1..31 -->
+                </select>
+                <select id="doc-form-end-month" class="px-2 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white font-semibold" title="เดือน">
+                  <option value="01">ม.ค.</option>
+                  <option value="02">ก.พ.</option>
+                  <option value="03">มี.ค.</option>
+                  <option value="04">เม.ย.</option>
+                  <option value="05">พ.ค.</option>
+                  <option value="06">มิ.ย.</option>
+                  <option value="07">ก.ค.</option>
+                  <option value="08">ส.ค.</option>
+                  <option value="09">ก.ย.</option>
+                  <option value="10">ต.ค.</option>
+                  <option value="11">พ.ย.</option>
+                  <option value="12">ธ.ค.</option>
+                </select>
+                <select id="doc-form-end-year" class="px-2 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white font-semibold" title="ปี พ.ศ.">
+                  <option value="2026">2569</option>
+                  <option value="2027">2570</option>
+                  <option value="2028">2571</option>
+                </select>
+              </div>
+              <input type="hidden" id="doc-form-end-date" value="2026-10-03" />
             </div>
 
           </div>

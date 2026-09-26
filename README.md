@@ -123,6 +123,7 @@ function doPost(e) {
     const postData = JSON.parse(e.postData.contents);
     const action = postData.action;
 
+    // 1. ดึงข้อมูลบุคลากรและเอกสารเวียนทั้งหมด
     if (action === "getAppData") {
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const userSheet = ss.getSheetByName("Users");
@@ -151,15 +152,22 @@ function doPost(e) {
       for (let i = 1; i < docRows.length; i++) {
         const row = docRows[i];
         if (row[0]) {
+          const targetAud = String(row[6] || "all").trim();
+          const acks = String(row[7] || "").split(",").map(s => s.trim()).filter(Boolean);
+          const prio = String(row[3] || "ปกติ").trim();
           docs.push({
             id: String(row[0]).trim(),
             createdAt: String(row[1] || ""),
             title: String(row[2] || "").trim(),
-            priority: String(row[3] || "ปกติ").trim(),
+            priority: prio,
+            urgencyLevel: prio,
             startDate: String(row[4] || ""),
             endDate: String(row[5] || ""),
-            targetType: String(row[6] || "all").trim(),
-            acknowledgedUsers: String(row[7] || "").split(",").map(s => s.trim()).filter(Boolean)
+            targetType: targetAud.toLowerCase() === "all" ? "all" : "specific",
+            targetAudience: targetAud,
+            targetUsers: targetAud.toLowerCase() === "all" ? [] : targetAud.split(",").map(s => s.trim()).filter(Boolean),
+            acknowledgedUsers: acks,
+            readStatus: acks
           });
         }
       }
@@ -170,34 +178,149 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 2. สลับหรืออัปเดตบทบาทบุคลากร (User <-> Admin) ใน Google Sheet โดยตรง
+    if (action === "updateUserRole") {
+      const userId = String(postData.userId).trim();
+      const newRole = String(postData.role || "user").trim().toLowerCase();
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const userSheet = ss.getSheetByName("Users");
+      const rows = userSheet.getDataRange().getValues();
+      let found = false;
+
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]).trim() === userId) {
+          // คอลัมน์ E คือ Role (1-indexed คือ แถว i + 1, คอลัมน์ 5)
+          userSheet.getRange(i + 1, 5).setValue(newRole);
+          found = true;
+          break;
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: found ? "success" : "error",
+        message: found ? "อัปเดตบทบาทสำเร็จ" : "ไม่พบรหัสบุคลากร"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. แก้ไขข้อมูลบุคลากร (ชื่อ, แผนก, อีเมล, บทบาท)
+    if (action === "updateUser") {
+      const data = postData.data;
+      const userId = String(data.id).trim();
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const userSheet = ss.getSheetByName("Users");
+      const rows = userSheet.getDataRange().getValues();
+      let found = false;
+
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]).trim() === userId) {
+          if (data.name !== undefined) userSheet.getRange(i + 1, 3).setValue(data.name);
+          if (data.department !== undefined) userSheet.getRange(i + 1, 4).setValue(data.department);
+          if (data.role !== undefined) userSheet.getRange(i + 1, 5).setValue(String(data.role).toLowerCase());
+          if (data.email !== undefined) userSheet.getRange(i + 1, 6).setValue(data.email);
+          found = true;
+          break;
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: found ? "success" : "error",
+        message: found ? "อัปเดตข้อมูลบุคลากรสำเร็จ" : "ไม่พบรหัสบุคลากร"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 4. เพิ่มบุคลากรใหม่เข้า Google Sheet
+    if (action === "addUser") {
+      const data = postData.data;
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const userSheet = ss.getSheetByName("Users");
+      const rows = userSheet.getDataRange().getValues();
+      const userId = String(data.id).trim();
+      
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]).trim() === userId) {
+          return ContentService.createTextOutput(JSON.stringify({
+            status: "error",
+            message: "รหัสพนักงานนี้มีอยู่ในระบบแล้ว"
+          })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+
+      userSheet.appendRow([
+        userId,
+        String(data.pin || userId).trim(),
+        String(data.name || "").trim(),
+        String(data.department || "").trim(),
+        String(data.role || "user").trim().toLowerCase(),
+        String(data.email || "").trim()
+      ]);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "เพิ่มบุคลากรเรียบร้อย"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 5. ลบบุคลากรออกจาก Google Sheet
+    if (action === "deleteUser") {
+      const userId = String(postData.userId).trim();
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const userSheet = ss.getSheetByName("Users");
+      const rows = userSheet.getDataRange().getValues();
+      let found = false;
+
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]).trim() === userId) {
+          userSheet.deleteRow(i + 1);
+          found = true;
+          break;
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: found ? "success" : "error",
+        message: found ? "ลบข้อมูลสำเร็จ" : "ไม่พบรหัสบุคลากร"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 6. เพิ่มเอกสารเวียนและอัปโหลดไฟล์ไปยัง Google Drive (มี Try-Catch ป้องกัน Drive permission error)
     if (action === "addDocument") {
       const data = postData.data;
-      const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-      
       let fileUrl = "";
+      
       if (data.fileBase64) {
-        const matches = data.fileBase64.match(/^data:(.*?);base64,(.*)$/);
-        const mimeType = matches ? matches[1] : "application/pdf";
-        const base64Data = matches ? matches[2] : data.fileBase64;
-        const decoded = Utilities.base64Decode(base64Data);
-        const blob = Utilities.newBlob(decoded, mimeType, data.fileName || "document.pdf");
-        const file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        fileUrl = file.getUrl();
+        try {
+          const matches = data.fileBase64.match(/^data:(.*?);base64,(.*)$/);
+          const mimeType = matches ? matches[1] : "application/pdf";
+          const base64Data = matches ? matches[2] : data.fileBase64;
+          const decoded = Utilities.base64Decode(base64Data);
+          const blob = Utilities.newBlob(decoded, mimeType, data.fileName || "document.pdf");
+          const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+          const file = folder.createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          fileUrl = file.getUrl();
+        } catch (driveErr) {
+          // หากติดสิทธิ์การเข้าถึง Google Drive ให้บันทึกลิงก์เดิมหรือข้ามไฟล์ เพื่อให้บันทึกลง Sheet สำเร็จเสมอ
+          fileUrl = data.fileUrl || "";
+        }
       }
 
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const docSheet = ss.getSheetByName("Documents");
       const docId = "DOC-" + new Date().getFullYear() + "-" + ("00" + (docSheet.getLastRow())).slice(-3);
       
+      const priority = data.priority || data.urgencyLevel || "ปกติ";
+      const targetAudience = (data.targetType === "all" || String(data.targetAudience).toLowerCase() === "all") 
+        ? "All" 
+        : (Array.isArray(data.targetUsers) ? data.targetUsers.join(",") : (data.targetAudience || "All"));
+
       docSheet.appendRow([
         docId,
         new Date().toISOString(),
-        data.title,
-        data.priority,
+        data.title + (fileUrl ? " (" + fileUrl + ")" : ""),
+        priority,
         data.startDate,
         data.endDate,
-        data.targetType === "all" ? "all" : (data.targetUsers || []).join(","),
+        targetAudience,
         "" // ผู้รับทราบเริ่มต้น
       ]);
 
@@ -209,6 +332,7 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 7. บันทึกการรับทราบเอกสาร
     if (action === "acknowledge") {
       const docId = postData.docId;
       const userId = postData.userId;
