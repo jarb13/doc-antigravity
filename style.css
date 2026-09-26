@@ -1,0 +1,252 @@
+/* ==========================================================================
+   HQD Document Circulation System - Elder-Friendly & Glow Effects CSS
+   ========================================================================== */
+
+/* 1. Base Typography & Accessibility (Elder-friendly) */
+:root {
+  --base-font-size: 19px;
+  --glow-transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html {
+  font-size: var(--base-font-size);
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accessibility Font Size Scales */
+html.font-scale-sm {
+  --base-font-size: 17px;
+}
+
+html.font-scale-md {
+  --base-font-size: 19px;
+}
+
+html.font-scale-lg {
+  --base-font-size: 22px;
+}
+
+body {
+  font-family: 'Prompt', 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.65;
+  color: #1e293b;
+  background-color: #f8fafc;
+}
+
+/* Focus indicator for keyboard navigation & accessibility */
+*:focus-visible {
+  outline: 3px solid #0e8ce8 !important;
+  outline-offset: 3px !important;
+}
+
+/* Smooth custom scrollbars for readability */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+  border: 2px solid #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ==========================================================================
+   2. STATUS GLOW EFFECTS (Core Requirement)
+   ========================================================================== */
+
+/* 🟢 Green Glow: 100% Acknowledged */
+.doc-card.glow-green {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4), 
+              0 0 45px rgba(34, 197, 94, 0.2),
+              0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+  transition: var(--glow-transition);
+}
+
+.doc-card.glow-green:hover {
+  box-shadow: 0 0 28px rgba(34, 197, 94, 0.6), 
+              0 0 60px rgba(34, 197, 94, 0.3),
+              0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 🟡 Yellow/Orange Glow: Deadline within 3 days */
+.doc-card.glow-yellow {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 22px rgba(245, 158, 11, 0.5), 
+              0 0 50px rgba(245, 158, 11, 0.25),
+              0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+  animation: pulse-yellow-glow 3s infinite alternate ease-in-out;
+  transition: var(--glow-transition);
+}
+
+.doc-card.glow-yellow:hover {
+  box-shadow: 0 0 32px rgba(245, 158, 11, 0.7), 
+              0 0 70px rgba(245, 158, 11, 0.4),
+              0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+
+@keyframes pulse-yellow-glow {
+  0% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), 
+                0 0 35px rgba(245, 158, 11, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 28px rgba(245, 158, 11, 0.65), 
+                0 0 60px rgba(245, 158, 11, 0.35);
+  }
+}
+
+/* 🔴 Red Glow: Overdue & has unread staff */
+.doc-card.glow-red {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.6), 
+              0 0 55px rgba(239, 68, 68, 0.3),
+              0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+  animation: pulse-red-glow 2.5s infinite alternate ease-in-out;
+  transition: var(--glow-transition);
+}
+
+.doc-card.glow-red:hover {
+  box-shadow: 0 0 34px rgba(239, 68, 68, 0.8), 
+              0 0 75px rgba(239, 68, 68, 0.45),
+              0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+
+@keyframes pulse-red-glow {
+  0% {
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.45), 
+                0 0 38px rgba(239, 68, 68, 0.25);
+  }
+  100% {
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.75), 
+                0 0 65px rgba(239, 68, 68, 0.4);
+  }
+}
+
+/* ⚪ Normal / No Glow: Regular document */
+.doc-card.glow-none {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.05), 
+              0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  transition: var(--glow-transition);
+}
+
+.doc-card.glow-none:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 
+              0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
+
+/* ==========================================================================
+   3. Navigation Tabs
+   ========================================================================== */
+.nav-tab {
+  color: #475569;
+  border-bottom: 4px solid transparent;
+  background-color: transparent;
+}
+
+.nav-tab:hover {
+  color: #0e8ce8;
+  background-color: #f0f7ff;
+}
+
+.nav-tab.active {
+  color: #0358a1 !important;
+  background-color: #e0effe !important;
+  border-bottom-color: #0e8ce8 !important;
+}
+
+/* ==========================================================================
+   4. Elder-Friendly Touch Targets & Form Elements
+   ========================================================================== */
+button, input, select, textarea {
+  min-height: 48px;
+}
+
+/* Modal Animations */
+.animate-scale-up {
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Checkbox card styling for Elder-friendly target selection */
+.user-checkbox-card {
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.user-checkbox-card:hover {
+  background-color: #f0f9ff;
+  border-color: #7cc7fb;
+}
+
+.user-checkbox-card.selected {
+  background-color: #eff6ff;
+  border-color: #3b82f6;
+}
+
+/* Status Indicator Dot Animation */
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.syncing-dot {
+  background-color: #0ea5e9 !important;
+  animation: syncPulse 1s infinite ease-in-out !important;
+}
+
+/* ==========================================================================
+   5. Toast Notification Styling (High Contrast & Clear)
+   ========================================================================== */
+.toast-msg {
+  pointer-events: auto;
+  border-radius: 1.25rem;
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.2), 0 0 10px rgba(0, 0, 0, 0.05);
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Print Styles */
+@media print {
+  header, nav, #toast-container, .modal-overlay, button {
+    display: none !important;
+  }
+  body, main {
+    background: white !important;
+    font-size: 14pt !important;
+  }
+}
