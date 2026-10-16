@@ -392,6 +392,66 @@
 
                     </div>
 
+                    <!-- ==================== ADMIN DOCUMENT SORTING ENFORCER BAR ==================== -->
+                    <div id="admin-sort-bar-container"
+                        class="bg-gradient-to-r from-slate-50 via-white to-indigo-50/30 p-5 rounded-3xl border-2 border-slate-200/90 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+                        <!-- Left: Info & Indicator -->
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-12 h-12 rounded-2xl bg-hqd-600 text-white flex items-center justify-center text-xl flex-shrink-0 shadow-md shadow-hqd-600/20">
+                                <i class="fa-solid fa-arrow-down-short-wide"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h3 class="text-lg sm:text-xl font-bold text-slate-900">
+                                        ลำดับการแสดงเอกสารสำหรับทุกคน</h3>
+                                    <span id="admin-sort-badge-enforced"
+                                        class="text-xs px-2.5 py-0.5 rounded-full bg-hqd-100 text-hqd-800 font-bold border border-hqd-300">
+                                        <i class="fa-solid fa-shield-halved mr-1"></i>สิทธิ์แอดมินกำหนด
+                                    </span>
+                                </div>
+                                <p id="admin-sort-subtitle" class="text-sm text-slate-500 mt-0.5">
+                                    แอดมินสามารถกดปุ่มด้านขวา เพื่อบังคับลำดับเอกสารที่บุคลากรทุกคนจะเห็นในระบบ
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Right: Admin Sort Toggle Buttons (Visible for Admin) -->
+                        <div id="admin-sort-buttons-wrapper" class="flex flex-wrap items-center gap-2">
+                            <button type="button" data-sort="date-desc"
+                                class="admin-sort-btn px-4 py-2.5 rounded-xl font-bold text-base transition flex items-center gap-2 cursor-pointer shadow-sm border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                title="เรียงตามวันที่แจ้งจากใหม่สุดไปเก่าสุด">
+                                <i class="fa-solid fa-arrow-down-wide-short text-lg"></i>
+                                <span>วันที่: ใหม่ ➔ เก่า</span>
+                            </button>
+                            <button type="button" data-sort="date-asc"
+                                class="admin-sort-btn px-4 py-2.5 rounded-xl font-bold text-base transition flex items-center gap-2 cursor-pointer shadow-sm border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                title="เรียงตามวันที่แจ้งจากเก่าสุดไปใหม่สุด">
+                                <i class="fa-solid fa-arrow-up-short-wide text-lg"></i>
+                                <span>วันที่: เก่า ➔ ใหม่</span>
+                            </button>
+                            <button type="button" data-sort="priority"
+                                class="admin-sort-btn px-4 py-2.5 rounded-xl font-bold text-base transition flex items-center gap-2 cursor-pointer shadow-sm border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                title="เรียงตามระดับความเร่งด่วน: ด่วนที่สุด > ด่วน > ปกติ">
+                                <i class="fa-solid fa-fire-flame-curved text-rose-500 text-lg"></i>
+                                <span>ความเร่งด่วน</span>
+                            </button>
+                        </div>
+
+                        <!-- User Info Indicator (Visible for Regular User) -->
+                        <div id="user-sort-display-wrapper"
+                            class="hidden flex items-center gap-2 text-slate-700 text-base">
+                            <span class="font-medium text-slate-500">จัดเรียงตาม:</span>
+                            <span id="user-sort-order-label"
+                                class="font-bold text-hqd-800 bg-white px-3.5 py-1.5 rounded-xl border border-slate-300 shadow-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-arrow-down-wide-short text-hqd-600"></i>
+                                <span>วันที่: ใหม่ ➔ เก่า</span>
+                            </span>
+                        </div>
+
+                    </div>
+
                     <!-- Document Cards Grid (Large Elder-Friendly Cards) -->
                     <div id="docs-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
                         <!-- Dynamic Document Cards will be rendered here by app.js -->
@@ -958,8 +1018,10 @@
                     src="about:blank"></iframe>
                 <img id="viewer-image" class="hidden max-h-full max-w-full object-contain rounded-2xl shadow"
                     alt="เอกสารแนบ" />
-                <div id="viewer-empty-notice" class="hidden flex flex-col items-center justify-center text-center p-8 bg-white rounded-3xl border-2 border-slate-200 max-w-lg shadow-sm">
-                    <div class="w-20 h-20 rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center text-4xl mb-4 shadow-sm">
+                <div id="viewer-empty-notice"
+                    class="hidden flex flex-col items-center justify-center text-center p-8 bg-white rounded-3xl border-2 border-slate-200 max-w-lg shadow-sm">
+                    <div
+                        class="w-20 h-20 rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center text-4xl mb-4 shadow-sm">
                         <i class="fa-solid fa-file-circle-exclamation"></i>
                     </div>
                     <h4 class="text-2xl font-bold text-slate-800 mb-2">ไม่พบไฟล์เอกสารแนบ</h4>

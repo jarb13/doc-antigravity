@@ -38,6 +38,17 @@
 ### 5. ความปลอดภัยและการป้องกัน XSS (Security)
 - มีฟังก์ชัน Sanitize HTML (`escapeHtml`) กรองอักขระพิเศษ ป้องกันการโจมตีแบบ Cross-Site Scripting (XSS) ในทุกจุดที่มีการแสดงผลข้อมูล
 
+### 6. การลบเอกสารแบบ Real-time ข้ามผู้ใช้ทุกคน (Global Document Deletion)
+- เมื่อ Admin กดลบเอกสารฉบับใด ระบบจะส่งคำสั่งไปยัง Google Apps Script เพื่อลบแถวใน Google Sheet ทันที พร้อมย้ายไฟล์แนบบน Google Drive ลงถังขยะ
+- ระบบจะอัปเดตและลบเอกสารนั้นออกจากหน้าจอและแคชของบุคลากรทุกคนโดยอัตโนมัติ เพื่อป้องกันการแสดงผลเอกสารที่ผิดพลาด
+
+### 7. การบังคับลำดับการจัดเรียงเอกสารสำหรับทุกคน (Admin Document Sorting Enforcer)
+- สิทธิ์ Admin สามารถกดเลือกรูปแบบการจัดเรียงเอกสารได้จากแถบควบคุมด้านบนของหน้ารายการเอกสาร:
+  - 📅 **วันที่: ใหม่ ➔ เก่า (`date-desc`)**: แสดงเอกสารที่ประกาศล่าสุดไว้บนสุด
+  - 📅 **วันที่: เก่า ➔ ใหม่ (`date-asc`)**: แสดงเอกสารที่ประกาศก่อนไว้บนสุด
+  - 🔥 **ความเร่งด่วน (`priority`)**: จัดเรียงตามระดับความสำคัญ (ด่วนที่สุด > ด่วน > ปกติ)
+- เมื่อ Admin เปลี่ยนรูปแบบการเรียง ระบบจะบันทึกลงใน Google Sheet ทันที และบังคับให้หน้าจอของบุคลากรทุกคนจัดเรียงตามรูปแบบที่ Admin กำหนดไว้โดยอัตโนมัติ
+
 ---
 
 ## 🗂️ โครงสร้างไฟล์ในโครงการ (Project Structure)
@@ -158,7 +169,7 @@ function doPost(e) {
     const postData = JSON.parse(e.postData.contents);
     const action = postData.action;
 
-    // 1. ดึงข้อมูลบุคลากรและเอกสารเวียนทั้งหมด
+    // 1. ดึงข้อมูลบุคลากร, เอกสารเวียน, และการตั้งค่าระบบทั้งหมด
     if (action === "getAppData") {
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const userSheet = ss.getSheetByName("Users");
@@ -181,7 +192,7 @@ function doPost(e) {
         }
       }
 
-      // Read Documents
+      // Read Documents (รองรับทั้ง 8 คอลัมน์ และ 9 คอลัมน์ตามโครงสร้างจริงของ Sheet)
       const docRows = docSheet ? docSheet.getDataRange().getValues() : [];
       const docs = [];
       for (let i = 1; i < docRows.length; i++) {
@@ -196,9 +207,11 @@ function doPost(e) {
             cleanTitle = rawTitle.replace(/\s*\((https?:\/\/[^)]+)\)/, "").trim();
           }
 
-          const targetAud = String(row[6] || "all").trim();
-          const acks = String(row[7] || "").split(",").map(s => s.trim()).filter(Boolean);
-          const prio = String(row[3] || "ปกติ").trim();
+          // โครงสร้าง Sheet: Col A=0, B=1, C=2, D=3(ว่าง), E=4(ความสำคัญ), F=5(เริ่ม), G=6(สิ้นสุด), H=7(เป้าหมาย), I=8(รับทราบแล้ว)
+          const prio = String(row[4] || row[3] || "ปกติ").trim();
+          const targetAud = String(row[7] || row[6] || "all").trim();
+          const acks = String(row[8] || row[7] || "").split(",").map(s => s.trim()).filter(Boolean);
+
           docs.push({
             id: String(row[0]).trim(),
             createdAt: String(row[1] || ""),
@@ -206,8 +219,8 @@ function doPost(e) {
             fileUrl: fileUrl,
             priority: prio,
             urgencyLevel: prio,
-            startDate: String(row[4] || ""),
-            endDate: String(row[5] || ""),
+            startDate: String(row[5] || row[4] || ""),
+            endDate: String(row[6] || row[5] || ""),
             targetType: targetAud.toLowerCase() === "all" ? "all" : "specific",
             targetAudience: targetAud,
             targetUsers: targetAud.toLowerCase() === "all" ? [] : targetAud.split(",").map(s => s.trim()).filter(Boolean),
@@ -217,9 +230,28 @@ function doPost(e) {
         }
       }
 
+      // Read System Config (เช่น ลำดับการจัดเรียงเอกสารที่แอดมินบังคับ)
+      let documentSortOrder = "date-desc";
+      const configSheet = ss.getSheetByName("Config");
+      if (configSheet) {
+        const configRows = configSheet.getDataRange().getValues();
+        for (let i = 1; i < configRows.length; i++) {
+          if (String(configRows[i][0]).trim() === "documentSortOrder") {
+            documentSortOrder = String(configRows[i][1] || "date-desc").trim();
+            break;
+          }
+        }
+      }
+
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        data: { users: users, docs: docs }
+        data: {
+          users: users,
+          docs: docs,
+          config: {
+            documentSortOrder: documentSortOrder
+          }
+        }
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -361,15 +393,17 @@ function doPost(e) {
         ? String(data.title || "").trim() + " (" + fileUrl + ")"
         : String(data.title || "").trim();
 
+      // บันทึกแถวใหม่ (เว้น Col D ตามโครงสร้าง Sheet 9 คอลัมน์)
       docSheet.appendRow([
         docId,
         now.toISOString(),
         fullTitle,
+        "",  // Col D ว่าง
         priority,
         String(data.startDate || ""),
         String(data.endDate || ""),
         targetAudience,
-        ""  // ผู้รับทราบเริ่มต้นว่าง
+        ""  // ผู้รับทราบเริ่มต้นว่าง (Col I)
       ]);
 
       return ContentService.createTextOutput(JSON.stringify({
@@ -390,10 +424,11 @@ function doPost(e) {
 
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][0]).trim() === String(docId).trim()) {
-          const currentAcks = String(rows[i][7] || "").split(",").map(s => s.trim()).filter(Boolean);
+          const colIndex = rows[0].length >= 9 ? 9 : 8;
+          const currentAcks = String(rows[i][colIndex - 1] || "").split(",").map(s => s.trim()).filter(Boolean);
           if (!currentAcks.includes(userId)) {
             currentAcks.push(userId);
-            docSheet.getRange(i + 1, 8).setValue(currentAcks.join(","));
+            docSheet.getRange(i + 1, colIndex).setValue(currentAcks.join(","));
           }
           break;
         }
@@ -405,19 +440,30 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 8. ลบเอกสารเวียนออกจาก Google Sheet
+    // 8. ลบเอกสารเวียนออกจาก Google Sheet และ Google Drive (มีผลต่อบุคลากรทุกคน)
     if (action === "deleteDocument") {
-      const docId = String(postData.docId).trim();
+      const docId = String(postData.docId || "").trim();
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const docSheet = ss.getSheetByName("Documents");
       if (docSheet) {
         const rows = docSheet.getDataRange().getValues();
         for (let i = 1; i < rows.length; i++) {
           if (String(rows[i][0]).trim() === docId) {
+            // ย้ายไฟล์แนบบน Google Drive ลงถังขยะ (ถ้ามี)
+            try {
+              const fileLinkMatch = String(rows[i][2] || "").match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+              if (fileLinkMatch && fileLinkMatch[1]) {
+                DriveApp.getFileById(fileLinkMatch[1]).setTrashed(true);
+              }
+            } catch (driveErr) {
+              Logger.log("Drive trash error: " + driveErr.toString());
+            }
+
             docSheet.deleteRow(i + 1);
             return ContentService.createTextOutput(JSON.stringify({
               status: "success",
-              message: "ลบเอกสารสำเร็จ"
+              message: "ลบเอกสารออกจากระบบและ Google Drive สำเร็จ",
+              docId: docId
             })).setMimeType(ContentService.MimeType.JSON);
           }
         }
@@ -425,6 +471,39 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
         message: "ไม่พบรหัสเอกสาร"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 9. บันทึกการตั้งค่าระบบ (เช่น ลำดับการจัดเรียงเอกสารที่แอดมินกำหนดสำหรับทุกคน)
+    if (action === "updateSystemConfig") {
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      let configSheet = ss.getSheetByName("Config");
+      if (!configSheet) {
+        configSheet = ss.insertSheet("Config");
+        configSheet.appendRow(["Key", "Value", "UpdatedAt"]);
+      }
+
+      const sortOrder = String((postData.data && postData.data.documentSortOrder) || "date-desc").trim();
+      const rows = configSheet.getDataRange().getValues();
+      let found = false;
+
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]).trim() === "documentSortOrder") {
+          configSheet.getRange(i + 1, 2).setValue(sortOrder);
+          configSheet.getRange(i + 1, 3).setValue(new Date().toISOString());
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        configSheet.appendRow(["documentSortOrder", sortOrder, new Date().toISOString()]);
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "บันทึกการตั้งค่าระบบสำเร็จ",
+        sortOrder: sortOrder
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
