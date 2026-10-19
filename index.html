@@ -697,7 +697,7 @@
             <!-- Modal Body (Scrollable) -->
             <div class="p-6 sm:p-8 overflow-y-auto space-y-6 flex-1 text-lg">
 
-                <form id="create-doc-form" class="space-y-6">
+                <form id="create-doc-form" class="space-y-6" novalidate>
 
                     <!-- Document Title & Official Type -->
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -705,7 +705,7 @@
                             <label for="doc-form-title" class="block font-bold text-slate-800 mb-2">
                                 ชื่อเรื่องเอกสาร <span class="text-rose-500">*</span>
                             </label>
-                            <input type="text" id="doc-form-title" required
+                            <input type="text" id="doc-form-title"
                                 placeholder="เช่น ประกาศแนวทางการปฏิบัติงานประจำปี 2569"
                                 class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition" />
                         </div>
@@ -713,7 +713,7 @@
                             <label for="doc-form-type" class="block font-bold text-slate-800 mb-2">
                                 ประเภทหนังสือราชการ <span class="text-rose-500">*</span>
                             </label>
-                            <select id="doc-form-type" required
+                            <select id="doc-form-type"
                                 class="w-full px-4 py-4 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white transition font-semibold cursor-pointer">
                                 <option value="ประกาศ" selected>📢 ประกาศ (Announcement)</option>
                                 <option value="คำสั่ง">📋 คำสั่ง (Order)</option>
@@ -733,7 +733,7 @@
                             <label for="doc-form-priority" class="block font-bold text-slate-800 mb-2">
                                 ระดับความสำคัญ <span class="text-rose-500">*</span>
                             </label>
-                            <select id="doc-form-priority" required
+                            <select id="doc-form-priority"
                                 class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white transition font-semibold">
                                 <option value="ปกติ">🟢 ปกติ (Normal)</option>
                                 <option value="ด่วน">🟠 ด่วน (Urgent)</option>
@@ -747,7 +747,7 @@
                             <label for="doc-form-start-date" class="block font-bold text-slate-800 mb-2">
                                 วันที่เริ่มสื่อสาร (วัน เดือน ปี) <span class="text-rose-500">*</span>
                             </label>
-                            <input type="date" id="doc-form-start-date" required
+                            <input type="date" id="doc-form-start-date"
                                 class="w-full px-4 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none bg-white transition font-semibold text-slate-800 cursor-pointer shadow-sm" />
                             <div id="doc-form-start-date-display"
                                 class="mt-2 text-sm font-semibold text-hqd-700 bg-hqd-50 px-3 py-1.5 rounded-xl border border-hqd-200 inline-flex items-center gap-2">
@@ -761,7 +761,7 @@
                             <label for="doc-form-end-date" class="block font-bold text-slate-800 mb-2">
                                 วันที่สิ้นสุด (วัน เดือน ปี) <span class="text-rose-500">*</span>
                             </label>
-                            <input type="date" id="doc-form-end-date" required
+                            <input type="date" id="doc-form-end-date"
                                 class="w-full px-4 py-3.5 text-base rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none bg-white transition font-semibold text-slate-800 cursor-pointer shadow-sm" />
                             <div id="doc-form-end-date-display"
                                 class="mt-2 text-sm font-semibold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 inline-flex items-center gap-2">
@@ -780,7 +780,7 @@
                         </label>
                         <div id="file-drop-zone"
                             class="border-3 border-dashed border-slate-300 hover:border-hqd-500 rounded-3xl p-6 text-center cursor-pointer bg-slate-50 hover:bg-hqd-50/50 transition">
-                            <input type="file" id="doc-form-file" accept=".pdf,image/*" class="hidden" required />
+                            <input type="file" id="doc-form-file" accept=".pdf,image/*" class="hidden" />
                             <div id="file-drop-prompt">
                                 <i class="fa-solid fa-cloud-arrow-up text-4xl text-hqd-600 mb-3"></i>
                                 <div class="text-xl font-bold text-slate-800">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่

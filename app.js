@@ -2234,11 +2234,13 @@
   const openCreateDocModal = () => {
     if (!isCurrentAdmin()) return;
     const form = $('create-doc-form');
-    form.reset();
+    if (form) form.reset();
     const typeSelect = $('doc-form-type');
     if (typeSelect) typeSelect.value = 'หนังสือเวียน';
     setupDatePickers();
     resetSelectedFile();
+    setCreateDocLoading(false);
+    state.busyModals.delete('modal-create-doc');
 
     // STRICT REQUIREMENT: Pre-check all users by default!
     state.selectedTargetUserIds = new Set(state.users.map(u => u.id));
@@ -2246,8 +2248,11 @@
     if (search) search.value = '';
     renderTargetUsersGrid();
 
-    form.querySelectorAll('input[name="targetType"]').forEach(r => { r.checked = r.value === 'all'; });
-    $('specific-users-container').classList.add('hidden');
+    if (form) {
+      form.querySelectorAll('input[name="targetType"]').forEach(r => { r.checked = r.value === 'all'; });
+    }
+    const specificContainer = $('specific-users-container');
+    if (specificContainer) specificContainer.classList.add('hidden');
     updateAllTargetHint();
 
     showModal('modal-create-doc', { initialFocus: '#doc-form-title' });
@@ -2346,11 +2351,13 @@
     const btnText = $('create-doc-btn-text');
     const btnIcon = $('create-doc-btn-icon');
     const progress = $('create-doc-progress');
-    submitBtn.disabled = loading;
-    submitBtn.classList.toggle('opacity-75', loading);
-    submitBtn.classList.toggle('cursor-wait', loading);
-    btnText.textContent = loading ? (label || 'กำลังบันทึก...') : 'บันทึกและเวียนเอกสาร';
-    btnIcon.className = loading ? 'fa-solid fa-spinner fa-spin text-xl' : 'fa-solid fa-paper-plane';
+    if (submitBtn) {
+      submitBtn.disabled = loading;
+      submitBtn.classList.toggle('opacity-75', loading);
+      submitBtn.classList.toggle('cursor-wait', loading);
+    }
+    if (btnText) btnText.textContent = loading ? (label || 'กำลังบันทึก...') : 'บันทึกและเวียนเอกสาร';
+    if (btnIcon) btnIcon.className = loading ? 'fa-solid fa-spinner fa-spin text-xl' : 'fa-solid fa-paper-plane';
     if (progress) progress.classList.toggle('hidden', !loading);
     document.querySelectorAll('#modal-create-doc .modal-close-btn').forEach(b => { b.disabled = loading; });
     if (loading) state.busyModals.add('modal-create-doc');
@@ -2359,37 +2366,68 @@
 
   /**
    * Handle Create Document Form Submit
-   * รอผลจากเซิร์ฟเวอร์จริง (ได้รหัสเอกสารและลิงก์ไฟล์ที่ถูกต้อง) ก่อนแจ้งสำเร็จ
+   * บันทึกเอกสารเวียน: ส่งข้อมูลไปยัง Google Apps Script
+   * หากเครือข่ายขัดข้อง จะทำการบันทึกข้อมูลและไฟล์ลงในเครื่องแบบออฟไลน์ทันที เพื่อไม่ให้ข้อมูลสูญหาย
    */
   const handleCreateDocumentSubmit = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (state.busyModals.has('modal-create-doc')) return;
 
-    const title = $('doc-form-title').value.trim();
-    const docType = $('doc-form-type') ? $('doc-form-type').value : inferDocType({ title });
-    const priority = $('doc-form-priority').value;
-    const startDate = $('doc-form-start-date').value;
-    const endDate = $('doc-form-end-date').value;
+    const titleInput = $('doc-form-title');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const typeSelect = $('doc-form-type');
+    const docType = typeSelect ? typeSelect.value : inferDocType({ title });
+    const prioritySelect = $('doc-form-priority');
+    const priority = prioritySelect ? prioritySelect.value : 'ปกติ';
+    const startInput = $('doc-form-start-date');
+    const startDate = startInput ? startInput.value : '';
+    const endInput = $('doc-form-end-date');
+    const endDate = endInput ? endInput.value : '';
     const targetType = (document.querySelector('input[name="targetType"]:checked') || {}).value || 'all';
     const file = state.selectedCreateFile;
 
-    if (!title) { showToast('กรุณากรอกชื่อเรื่องเอกสาร', 'warning'); $('doc-form-title').focus(); return; }
-    if (!startDate || !endDate) { showToast('กรุณาระบุวันที่เริ่มและวันครบกำหนดให้ครบถ้วน', 'warning'); return; }
-    if (endDate < startDate) { showToast('วันครบกำหนดต้องไม่น้อยกว่าวันที่เริ่มสื่อสาร', 'warning'); $('doc-form-end-date').focus(); return; }
-    if (!file) { showToast('กรุณาแนบไฟล์เอกสาร (PDF หรือ รูปภาพ)', 'warning'); return; }
+    if (!title) {
+      showToast('กรุณากรอกชื่อเรื่องเอกสาร', 'warning');
+      if (titleInput) titleInput.focus();
+      return;
+    }
+    if (!startDate || !endDate) {
+      showToast('กรุณาระบุวันที่เริ่มและวันครบกำหนดให้ครบถ้วน', 'warning');
+      return;
+    }
+    if (endDate < startDate) {
+      showToast('วันครบกำหนดต้องไม่น้อยกว่าวันที่เริ่มสื่อสาร', 'warning');
+      if (endInput) endInput.focus();
+      return;
+    }
+    if (!file) {
+      showToast('กรุณาแนบไฟล์เอกสาร (PDF หรือ รูปภาพ)', 'warning');
+      return;
+    }
 
     let targetUsers = [];
     if (targetType === 'specific') {
       targetUsers = Array.from(state.selectedTargetUserIds);
-      if (targetUsers.length === 0) { showToast('กรุณาเลือกบุคลากรเป้าหมายอย่างน้อย 1 คน', 'warning'); return; }
+      if (targetUsers.length === 0) {
+        showToast('กรุณาเลือกบุคลากรเป้าหมายอย่างน้อย 1 คน', 'warning');
+        return;
+      }
     }
 
     setCreateDocLoading(true, 'กำลังเตรียมไฟล์...');
+    let fileBase64 = '';
     try {
-      const fileBase64 = await readFileAsDataURL(file);
-      setCreateDocLoading(true, 'กำลังอัปโหลดและเวียนเอกสาร...');
+      fileBase64 = await readFileAsDataURL(file);
+    } catch {
+      fileBase64 = '';
+    }
 
-      const r = await apiPost('addDocument', {
+    setCreateDocLoading(true, 'กำลังอัปโหลดและเวียนเอกสาร...');
+    let r = null;
+    let isServerOk = false;
+
+    try {
+      r = await apiPost('addDocument', {
         data: {
           title,
           docType,
@@ -2408,16 +2446,22 @@
         }
       }, { timeout: CONFIG.UPLOAD_TIMEOUT_MS });
 
-      if (!isSuccess(r)) throw new Error((r && r.message) || 'บันทึกไม่สำเร็จ');
-
-      const docId = String(r.docId || `TMP-${Date.now()}`);
-      const newDoc = {
-        id: docId,
+      if (isSuccess(r)) {
+        isServerOk = true;
+      } else {
+        throw new Error((r && r.message) || 'บันทึกไม่สำเร็จ');
+      }
+    } catch (err) {
+      console.warn('apiPost addDocument error/offline:', err);
+      // หากเครือข่ายขัดข้อง ออฟไลน์ หรือเซิร์ฟเวอร์ยังไม่พร้อม ให้ fallback บันทึกลงในเครื่องทันทีเพื่อไม่ให้ข้อมูลสูญหาย
+      const localDocId = `LOCAL-${Date.now()}`;
+      const localDoc = {
+        id: localDocId,
         title,
         docType,
-        fileUrl: r.fileUrl || '',
+        fileUrl: fileBase64 || '',
         fileName: file.name,
-        fileMime: file.type,
+        fileMime: file.type || 'application/pdf',
         priority,
         startDate,
         endDate,
@@ -2429,31 +2473,60 @@
         createdAt: new Date().toISOString(),
         isPendingLocal: true
       };
-      state.localFiles.set(docId, file);
-      state.documents = [newDoc, ...state.documents.filter(d => d.id !== docId)];
+      state.localFiles.set(localDocId, file);
+      state.documents = [localDoc, ...state.documents.filter(d => d.id !== localDocId)];
       saveToLocalCache();
 
       setCreateDocLoading(false);
       closeModal('modal-create-doc', { force: true });
-      state.docSubTab = isAssignedTo(newDoc, meId()) ? 'pending' : 'all';
+      state.docSubTab = isAssignedTo(localDoc, meId()) ? 'pending' : 'all';
       resetDocFilters();
       renderCurrentTab();
 
-      if (!r.fileUrl) {
-        showToast('บันทึกเอกสารแล้ว แต่ไม่สามารถอัปโหลดไฟล์ไปยัง Google Drive ได้ (ผู้ดูแลต้องกด Run "authorizeDrive" ใน Apps Script) — บุคลากรคนอื่นจะยังไม่เห็นไฟล์แนบ', 'warning', 10000);
+      const isNet = err.network || !navigator.onLine || /เครือข่าย|เชื่อมต่อ|Network|Failed to fetch|AbortError|timeout/i.test(err.message || '');
+      if (isNet) {
+        showToast(`บันทึกเอกสาร "${title}" (${localDocId}) ลงในเครื่องเรียบร้อยแล้ว (จะซิงค์ขึ้นเซิร์ฟเวอร์อัตโนมัติเมื่อออนไลน์)`, 'info', 8000);
       } else {
-        showToast(`สร้างเอกสาร "${title}" (${docId}) และเวียนให้บุคลากรเรียบร้อยแล้ว`, 'success', 6000);
+        showToast(`บันทึกเอกสาร "${title}" (${localDocId}) ลงในเครื่องแล้ว (เซิร์ฟเวอร์ตอบกลับ: ${err.message || 'รอดำเนินการ'})`, 'warning', 10000);
       }
-      setTimeout(() => syncWithServer({ force: true }), 1500);
-    } catch (err) {
-      setCreateDocLoading(false);
-      if (err instanceof ApiError && err.timeout) {
-        showToast('หมดเวลารอการตอบกลับ — เอกสารอาจถูกบันทึกแล้ว ระบบกำลังตรวจสอบ กรุณาดูรายการก่อนส่งซ้ำ', 'warning', 9000);
-        syncWithServer({ force: true });
-      } else {
-        showToast(`ไม่สามารถบันทึกเอกสารได้: ${err.message}`, 'error');
-      }
+      return;
     }
+
+    const docId = String(r.docId || `TMP-${Date.now()}`);
+    const newDoc = {
+      id: docId,
+      title,
+      docType,
+      fileUrl: r.fileUrl || fileBase64 || '',
+      fileName: file.name,
+      fileMime: file.type || 'application/pdf',
+      priority,
+      startDate,
+      endDate,
+      targetType,
+      targetUsers,
+      acknowledgedUsers: [],
+      acknowledgedDetails: {},
+      createdBy: meId(),
+      createdAt: new Date().toISOString(),
+      isPendingLocal: !r.fileUrl
+    };
+    state.localFiles.set(docId, file);
+    state.documents = [newDoc, ...state.documents.filter(d => d.id !== docId)];
+    saveToLocalCache();
+
+    setCreateDocLoading(false);
+    closeModal('modal-create-doc', { force: true });
+    state.docSubTab = isAssignedTo(newDoc, meId()) ? 'pending' : 'all';
+    resetDocFilters();
+    renderCurrentTab();
+
+    if (!r.fileUrl) {
+      showToast('บันทึกเอกสารแล้ว แต่ไม่สามารถอัปโหลดไฟล์ไปยัง Google Drive ได้ (ผู้ดูแลต้องกด Run "authorizeDrive" ใน Apps Script) — บุคลากรคนอื่นจะยังไม่เห็นไฟล์แนบ', 'warning', 10000);
+    } else {
+      showToast(`สร้างเอกสาร "${title}" (${docId}) และเวียนให้บุคลากรเรียบร้อยแล้ว`, 'success', 6000);
+    }
+    setTimeout(() => syncWithServer({ force: true }), 1500);
   };
 
   /* ==========================================================================
