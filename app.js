@@ -65,8 +65,26 @@
     'priority': '<i class="fa-solid fa-fire-flame-curved text-rose-500"></i>'
   };
   const PRIORITY_RANK = { 'ด่วนที่สุด': 3, 'ด่วน': 2, 'ปกติ': 1 };
+  const DOC_TYPES = ['คำสั่ง', 'ประกาศ', 'หนังสือเวียน', 'บันทึกข้อความ', 'ระเบียบ/ข้อบังคับ', 'หนังสือทั่วไป'];
+  const DOC_TYPE_ICONS = {
+    'คำสั่ง': 'fa-file-invoice',
+    'ประกาศ': 'fa-bullhorn',
+    'หนังสือเวียน': 'fa-arrows-split-up-and-left',
+    'บันทึกข้อความ': 'fa-note-sticky',
+    'ระเบียบ/ข้อบังคับ': 'fa-scale-balanced',
+    'หนังสือทั่วไป': 'fa-file-lines'
+  };
+  const DOC_TYPE_COLORS = {
+    'คำสั่ง': 'bg-blue-50 text-blue-700 border-blue-300',
+    'ประกาศ': 'bg-indigo-50 text-indigo-700 border-indigo-300',
+    'หนังสือเวียน': 'bg-teal-50 text-teal-700 border-teal-300',
+    'บันทึกข้อความ': 'bg-amber-50 text-amber-800 border-amber-300',
+    'ระเบียบ/ข้อบังคับ': 'bg-purple-50 text-purple-700 border-purple-300',
+    'หนังสือทั่วไป': 'bg-slate-50 text-slate-700 border-slate-300'
+  };
   const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const APP_TITLE = 'ระบบเวียนเอกสาร HQD';
+
 
   /* Default Master Personnel Seed (from Google Sheet 167gvGXW7EeK4fdKJED1TKhqRiMJmFkte5-sH3Ybigk8)
      ใช้เฉพาะตอนเปิดครั้งแรกก่อนเชื่อมต่อเซิร์ฟเวอร์ได้เท่านั้น */
@@ -134,6 +152,24 @@
      3. SECURITY & UTILITY FUNCTIONS
      ========================================================================== */
   const $ = (id) => document.getElementById(id);
+  const safeOn = (idOrEl, event, handler) => {
+    const el = typeof idOrEl === 'string' ? $(idOrEl) : idOrEl;
+    if (el) el.addEventListener(event, handler);
+  };
+
+  /** Infer document type from title or document properties */
+  const inferDocType = (doc) => {
+    if (!doc) return 'หนังสือทั่วไป';
+    if (doc.docType && doc.docType !== 'all') return doc.docType;
+    const t = String(doc.title || '').trim();
+    if (/^คำสั่ง/i.test(t)) return 'คำสั่ง';
+    if (/^ประกาศ/i.test(t)) return 'ประกาศ';
+    if (/^หนังสือเวียน/i.test(t) || /เวียน/i.test(t)) return 'หนังสือเวียน';
+    if (/^บันทึกข้อความ/i.test(t) || /^บันทึก/i.test(t)) return 'บันทึกข้อความ';
+    if (/^ระเบียบ/i.test(t) || /^ข้อบังคับ/i.test(t)) return 'ระเบียบ/ข้อบังคับ';
+    return 'หนังสือทั่วไป';
+  };
+
 
   /**
    * Escape HTML to strictly prevent Cross-Site Scripting (XSS)
@@ -849,9 +885,12 @@
       });
     }
 
+    const docType = d.docType || d.category || inferDocType({ title });
+
     return {
       id,
       title: title || 'เอกสารเวียน',
+      docType,
       fileUrl,
       fileName: d.fileName || '',
       fileMime: d.fileMime || '',
@@ -893,6 +932,9 @@
           }
           return { ...u, role: o.role };
         });
+        if (isCurrentAdmin()) {
+          populateTargetUserFilter();
+        }
       }
     }
 
@@ -1292,6 +1334,14 @@
       if (state.activeTab === 'users') state.activeTab = 'docs';
     }
 
+    const adminTargetGroup = $('admin-target-filter-group');
+    if (adminTargetGroup) {
+      adminTargetGroup.classList.toggle('hidden', !isAdmin);
+    }
+    if (isAdmin) {
+      populateTargetUserFilter();
+    }
+
     const legendGreen = $('legend-green-text');
     if (legendGreen) legendGreen.textContent = isAdmin ? 'รับทราบครบทุกคน' : 'ท่านรับทราบแล้ว';
     const statusGreenOpt = document.querySelector('#doc-status-filter option[value="glow-green"]');
@@ -1439,7 +1489,22 @@
       priorityIcon = '<i class="fa-solid fa-bell mr-1.5 text-amber-600" aria-hidden="true"></i>';
     }
 
-    const targetLabel = doc.targetType === 'all'
+    // Document Type Badge
+    const docType = doc.docType || inferDocType(doc);
+    const docTypeColor = DOC_TYPE_COLORS[docType] || 'bg-slate-100 text-slate-700 border-slate-300';
+    const docTypeIcon = DOC_TYPE_ICONS[docType] || '<i class="fa-solid fa-file-lines mr-1.5" aria-hidden="true"></i>';
+
+    // Target Scope Badge & Label
+    const isTargetAll = doc.targetType === 'all';
+    const targetBadgeHtml = isTargetAll
+      ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-base font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="เอกสารนี้เวียนถึงบุคลากรทุกคนในองค์กร">
+           <i class="fa-solid fa-bullhorn text-indigo-500" aria-hidden="true"></i><span>ส่งทุกคนในองค์กร</span>
+         </span>`
+      : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-base font-bold bg-amber-50 text-amber-800 border border-amber-200" title="เอกสารนี้ส่งเจาะจงรายบุคคล">
+           <i class="fa-solid fa-user-check text-amber-600" aria-hidden="true"></i><span>ส่งรายบุคคล (${stats.total} คน)</span>
+         </span>`;
+
+    const targetLabel = isTargetAll
       ? `บุคลากรทุกคน (${stats.total} คน)`
       : `ระบุเฉพาะบุคคล (${stats.total} คน)`;
 
@@ -1478,7 +1543,9 @@
           <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="px-3 py-1 rounded-xl text-base font-bold bg-slate-100 text-slate-700 border border-slate-300">${safeId}</span>
+              <span class="px-3.5 py-1 rounded-xl text-base font-bold border ${docTypeColor}">${docTypeIcon}${escapeHtml(docType)}</span>
               <span class="px-3.5 py-1 rounded-xl text-base font-bold ${priorityClass}">${priorityIcon}${escapeHtml(doc.priority)}</span>
+              ${isAdmin ? targetBadgeHtml : ''}
               ${doc.isPendingLocal ? '<span class="px-3 py-1 rounded-xl text-sm font-bold bg-sky-50 text-sky-800 border border-sky-300"><i class="fa-solid fa-rotate mr-1" aria-hidden="true"></i>กำลังซิงค์</span>' : ''}
             </div>
             <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-base font-bold border ${statusMeta.badgeColor}">
@@ -1504,7 +1571,7 @@
               <span>ครบกำหนด: <strong>${escapeHtml(formatThaiDate(doc.endDate))}</strong></span>
             </div>
             <div class="flex items-center gap-2 sm:col-span-2">
-              <i class="fa-solid fa-users text-slate-500" aria-hidden="true"></i>
+              <i class="fa-solid fa-users ${isTargetAll ? 'text-indigo-500' : 'text-amber-500'}" aria-hidden="true"></i>
               <span>เป้าหมาย: <strong>${escapeHtml(targetLabel)}</strong></span>
             </div>
             ${isAckByMe && myAckTime ? `
@@ -1555,12 +1622,31 @@
     `;
   };
 
+  /**
+   * Populate Target User Filter dropdown for Admin
+   */
+  const populateTargetUserFilter = () => {
+    const sel = $('doc-target-user-filter');
+    if (!sel) return;
+    const currentVal = sel.value;
+    const users = (state.users || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
+    sel.innerHTML = '<option value="all">-- ทุกคนที่มีในระบบ (ไม่เจาะจงบุคคล) --</option>' +
+      users.map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.name)}${u.department ? ` (${escapeHtml(u.department)})` : ''}</option>`).join('');
+    if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+      sel.value = currentVal;
+    }
+  };
+
   const renderDocuments = () => {
     const grid = $('docs-grid');
     const emptyState = $('docs-empty-state');
     const searchInput = $('doc-search-input');
     const statusFilter = $('doc-status-filter');
     const priorityFilter = $('doc-priority-filter');
+    const typeFilter = $('doc-type-filter');
+    const targetFilter = $('doc-target-filter');
+    const targetUserFilter = $('doc-target-user-filter');
+    const targetUserWrapper = $('doc-target-user-filter-wrapper');
     if (!grid || !state.currentUser) return;
 
     const isAdmin = isCurrentAdmin();
@@ -1595,32 +1681,80 @@
       : state.docSubTab === 'acked' ? buckets.acked
         : buckets.all;
 
+    // Search filter
     const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
     if (searchTerm) {
       displayDocs = displayDocs.filter(d =>
         (d.title || '').toLowerCase().includes(searchTerm) ||
-        (d.id || '').toLowerCase().includes(searchTerm)
+        (d.id || '').toLowerCase().includes(searchTerm) ||
+        (d.docType || inferDocType(d)).toLowerCase().includes(searchTerm)
       );
     }
 
+    // Priority filter
     const selectedPriority = priorityFilter ? priorityFilter.value : 'all';
-    if (selectedPriority !== 'all') displayDocs = displayDocs.filter(d => d.priority === selectedPriority);
+    if (selectedPriority !== 'all') {
+      displayDocs = displayDocs.filter(d => d.priority === selectedPriority);
+    }
 
+    // Status filter
     const selectedStatus = statusFilter ? statusFilter.value : 'all';
-    if (selectedStatus !== 'all') displayDocs = displayDocs.filter(d => calculateDocStatus(d).statusKey === selectedStatus);
+    if (selectedStatus !== 'all') {
+      displayDocs = displayDocs.filter(d => calculateDocStatus(d).statusKey === selectedStatus);
+    }
+
+    // Official Document Type filter
+    const selectedType = typeFilter ? typeFilter.value : 'all';
+    if (selectedType !== 'all') {
+      displayDocs = displayDocs.filter(d => (d.docType || inferDocType(d)) === selectedType);
+    }
+
+    // Delivery Target filter (All vs Individual)
+    const selectedTarget = (isAdmin && targetFilter) ? targetFilter.value : 'all';
+    const isIndividual = selectedTarget === 'individual' || selectedTarget === 'specific';
+    if (targetUserWrapper) {
+      if (isAdmin && isIndividual) {
+        targetUserWrapper.classList.remove('hidden');
+      } else {
+        targetUserWrapper.classList.add('hidden');
+      }
+    }
+
+    if (selectedTarget === 'all_staff' || selectedTarget === 'everyone') {
+      displayDocs = displayDocs.filter(d => d.targetType === 'all');
+    } else if (isIndividual) {
+      displayDocs = displayDocs.filter(d => d.targetType !== 'all');
+    }
+
+    // Specific individual personnel filter
+    const selectedTargetUser = (isAdmin && targetUserFilter && isIndividual) ? targetUserFilter.value : 'all';
+    if (selectedTargetUser !== 'all') {
+      displayDocs = displayDocs.filter(d => {
+        if (d.targetType === 'all') return true;
+        return Array.isArray(d.targetUsers) && d.targetUsers.some(uid => normId(uid) === normId(selectedTargetUser));
+      });
+    }
 
     displayDocs = sortDocs(displayDocs.slice());
 
+    const isFiltered = Boolean(
+      searchTerm ||
+      selectedPriority !== 'all' ||
+      selectedStatus !== 'all' ||
+      selectedType !== 'all' ||
+      selectedTarget !== 'all' ||
+      selectedTargetUser !== 'all'
+    );
+
     const resultCount = $('docs-result-count');
     if (resultCount) {
-      const filtered = searchTerm || selectedPriority !== 'all' || selectedStatus !== 'all';
-      resultCount.textContent = filtered ? `พบ ${displayDocs.length} ฉบับตามตัวกรอง` : '';
+      resultCount.textContent = isFiltered ? `พบ ${displayDocs.length} ฉบับตามตัวกรอง` : '';
     }
 
     if (displayDocs.length === 0) {
       grid.innerHTML = '';
       emptyState.classList.remove('hidden');
-      emptyState.innerHTML = renderEmptyState({ searchTerm, selectedPriority, selectedStatus, buckets, isAdmin });
+      emptyState.innerHTML = renderEmptyState({ isFiltered, buckets, isAdmin });
       return;
     }
 
@@ -1629,8 +1763,8 @@
     grid.innerHTML = displayDocs.map(renderDocCard).join('');
   };
 
-  const renderEmptyState = ({ searchTerm, selectedPriority, selectedStatus, buckets, isAdmin }) => {
-    if (searchTerm || selectedPriority !== 'all' || selectedStatus !== 'all') {
+  const renderEmptyState = ({ isFiltered, buckets, isAdmin }) => {
+    if (isFiltered) {
       return `
         <div class="text-center py-16 px-6 bg-white rounded-3xl border-2 border-dashed border-slate-300">
           <div class="w-20 h-20 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-3xl mb-4"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></div>
@@ -1682,6 +1816,10 @@
     const s = $('doc-search-input'); if (s) s.value = '';
     const p = $('doc-priority-filter'); if (p) p.value = 'all';
     const st = $('doc-status-filter'); if (st) st.value = 'all';
+    const t = $('doc-type-filter'); if (t) t.value = 'all';
+    const tg = $('doc-target-filter'); if (tg) tg.value = 'all';
+    const tu = $('doc-target-user-filter'); if (tu) tu.value = 'all';
+    const tuw = $('doc-target-user-filter-wrapper'); if (tuw) tuw.classList.add('hidden');
   };
 
   const renderAdminSortControls = () => {
@@ -1894,8 +2032,8 @@
           <td class="py-4 px-6 text-slate-600">${escapeHtml(user.department || '-')}</td>
           <td class="py-4 px-6 text-center" title="${escapeHtml(pendingTitle)}">
             ${info.pending.length === 0
-              ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-base font-bold bg-emerald-50 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-check" aria-hidden="true"></i> ครบ</span>'
-              : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-base font-bold ${info.overdue.length ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-amber-50 text-amber-900 border border-amber-300'}">
+          ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-base font-bold bg-emerald-50 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-check" aria-hidden="true"></i> ครบ</span>'
+          : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-base font-bold ${info.overdue.length ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-amber-50 text-amber-900 border border-amber-300'}">
                   ${info.pending.length} ฉบับ${info.overdue.length ? ` (เกินกำหนด ${info.overdue.length})` : ''}
                 </span>`}
           </td>
@@ -2097,6 +2235,8 @@
     if (!isCurrentAdmin()) return;
     const form = $('create-doc-form');
     form.reset();
+    const typeSelect = $('doc-form-type');
+    if (typeSelect) typeSelect.value = 'หนังสือเวียน';
     setupDatePickers();
     resetSelectedFile();
 
@@ -2191,10 +2331,13 @@
     $('file-drop-prompt').classList.add('hidden');
     $('file-selected-info').classList.remove('hidden');
 
-    // ช่วยกรอกชื่อเรื่องจากชื่อไฟล์ ถ้ายังว่าง
+    // ช่วยกรอกชื่อเรื่องจากชื่อไฟล์ ถ้ายังว่าง พร้อมตรวจหาประเภทเอกสารอัตโนมัติ
     const titleInput = $('doc-form-title');
     if (titleInput && !titleInput.value.trim()) {
       titleInput.value = file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+      const detected = inferDocType({ title: titleInput.value });
+      const typeSelect = $('doc-form-type');
+      if (typeSelect && detected) typeSelect.value = detected;
     }
   };
 
@@ -2223,6 +2366,7 @@
     if (state.busyModals.has('modal-create-doc')) return;
 
     const title = $('doc-form-title').value.trim();
+    const docType = $('doc-form-type') ? $('doc-form-type').value : inferDocType({ title });
     const priority = $('doc-form-priority').value;
     const startDate = $('doc-form-start-date').value;
     const endDate = $('doc-form-end-date').value;
@@ -2248,6 +2392,7 @@
       const r = await apiPost('addDocument', {
         data: {
           title,
+          docType,
           priority,
           urgencyLevel: priority,
           startDate,
@@ -2269,6 +2414,7 @@
       const newDoc = {
         id: docId,
         title,
+        docType,
         fileUrl: r.fileUrl || '',
         fileName: file.name,
         fileMime: file.type,
@@ -2414,6 +2560,8 @@
     const { ackUsers, pendingUsers, stats } = getTrackingLists(doc);
     const rows = [
       ['เอกสาร', `${doc.id} ${doc.title}`],
+      ['ประเภทหนังสือราชการ', doc.docType || inferDocType(doc)],
+      ['กลุ่มเป้าหมาย', doc.targetType === 'all' ? 'บุคลากรทุกคนในองค์กร' : `ระบุเฉพาะบุคคล (${stats.total} คน)`],
       ['ความสำคัญ', doc.priority],
       ['วันที่เริ่ม', formatThaiDate(doc.startDate)],
       ['วันครบกำหนด', formatThaiDate(doc.endDate)],
@@ -2838,12 +2986,27 @@
     ['pending', 'acked', 'all'].forEach(key => $(`doc-subtab-${key}`).addEventListener('click', () => switchDocSubTab(key)));
 
     let searchTimer = null;
-    $('doc-search-input').addEventListener('input', () => {
+    safeOn('doc-search-input', 'input', () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(renderDocuments, 150);
     });
-    $('doc-status-filter').addEventListener('change', renderDocuments);
-    $('doc-priority-filter').addEventListener('change', renderDocuments);
+    safeOn('doc-status-filter', 'change', renderDocuments);
+    safeOn('doc-priority-filter', 'change', renderDocuments);
+    safeOn('doc-type-filter', 'change', renderDocuments);
+    safeOn('doc-target-filter', 'change', () => {
+      const tf = $('doc-target-filter');
+      const tuf = $('doc-target-user-filter');
+      const val = tf ? tf.value : '';
+      if (val !== 'individual' && val !== 'specific' && tuf) {
+        tuf.value = 'all';
+      }
+      renderDocuments();
+    });
+    safeOn('doc-target-user-filter', 'change', renderDocuments);
+    safeOn('reset-doc-filters-btn', 'click', () => {
+      resetDocFilters();
+      renderDocuments();
+    });
 
     $('admin-sort-buttons-wrapper').addEventListener('click', (e) => {
       const btn = e.target.closest('.admin-sort-btn');

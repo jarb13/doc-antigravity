@@ -120,11 +120,19 @@
                         </p>
                     </div>
 
+                    <!-- Remember Login Option -->
+                    <div class="flex items-center justify-between text-base">
+                        <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 select-none">
+                            <input type="checkbox" id="login-remember" checked class="w-5 h-5 text-hqd-600 rounded border-2 border-slate-300 focus:ring-hqd-500 cursor-pointer" />
+                            <span class="font-medium">จดจำการเข้าสู่ระบบในอุปกรณ์นี้</span>
+                        </label>
+                    </div>
+
                     <!-- Submit Button -->
                     <button type="submit" id="login-submit-btn"
                         class="w-full py-4 px-6 text-2xl font-bold text-white bg-hqd-600 hover:bg-hqd-700 active:scale-[0.99] rounded-2xl shadow-xl shadow-hqd-600/30 transition flex items-center justify-center gap-3 cursor-pointer ring-4 ring-transparent focus:ring-hqd-300">
-                        <span>เข้าสู่ระบบ</span>
-                        <i class="fa-solid fa-arrow-right"></i>
+                        <span id="login-submit-text">เข้าสู่ระบบ</span>
+                        <i class="fa-solid fa-arrow-right" id="login-submit-icon"></i>
                     </button>
                 </form>
 
@@ -210,6 +218,14 @@
                                 </div>
                             </div>
 
+                            <!-- Change PIN Button -->
+                            <button type="button" id="open-change-pin-btn"
+                                class="px-3.5 py-2.5 text-base font-semibold text-slate-700 hover:text-hqd-700 bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 rounded-2xl transition flex items-center gap-2 cursor-pointer"
+                                title="เปลี่ยนรหัสผ่าน / PIN">
+                                <i class="fa-solid fa-key text-hqd-600"></i>
+                                <span class="hidden md:inline">เปลี่ยน PIN</span>
+                            </button>
+
                             <!-- Logout Button -->
                             <button type="button" id="logout-btn"
                                 class="px-4 py-2.5 text-base sm:text-lg font-semibold text-rose-600 hover:bg-rose-50 border-2 border-rose-200 hover:border-rose-400 rounded-2xl transition flex items-center gap-2 cursor-pointer"
@@ -278,7 +294,7 @@
                                         class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-medium">
                                         <span
                                             class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#22c55e] flex-shrink-0"></span>
-                                        รับทราบครบ 100%
+                                        <span id="legend-green-text">รับทราบครบ 100%</span>
                                     </span>
                                     <span
                                         class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border-2 border-amber-400 font-medium">
@@ -354,38 +370,112 @@
                             </div>
                         </div>
 
-                        <!-- Filters Bar (Search, Status Filter, Priority Filter) -->
-                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 pt-4 border-t border-slate-100">
+                        <!-- Interactive KPI Summary Dashboard Cards (docs-summary) -->
+                        <div id="docs-summary" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                            <!-- Populated dynamically by app.js renderDocsSummary -->
+                        </div>
 
-                            <!-- Search Box -->
-                            <div class="md:col-span-6 relative">
-                                <input type="text" id="doc-search-input" placeholder="ค้นหาชื่อเอกสาร หรือรหัสเอกสาร..."
-                                    class="w-full pl-12 pr-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white" />
-                                <i
-                                    class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none"></i>
+                        <!-- Comprehensive Filters Bar (Search, Doc Type, Target Scope, Target User, Priority, Status) -->
+                        <div class="space-y-4 pt-4 border-t border-slate-100">
+
+                            <!-- Row 1: Search Box & Result Counter / Reset Button -->
+                            <div class="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                                <div class="relative flex-1">
+                                    <input type="text" id="doc-search-input" placeholder="ค้นหาชื่อเรื่องเอกสาร, รหัสเอกสาร (เช่น DOC-001)..."
+                                        class="w-full pl-12 pr-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white" />
+                                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none"></i>
+                                </div>
+                                <div class="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
+                                    <span id="docs-result-count" class="font-bold text-hqd-700 text-base"></span>
+                                    <button type="button" id="reset-doc-filters-btn"
+                                        class="px-4 py-3 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 hover:text-slate-900 rounded-2xl text-base font-bold transition flex items-center gap-2 cursor-pointer border border-slate-300"
+                                        title="ล้างเงื่อนไขการค้นหาและตัวกรองทั้งหมด">
+                                        <i class="fa-solid fa-arrow-rotate-left text-slate-500"></i>
+                                        <span>ล้างตัวกรอง</span>
+                                    </button>
+                                </div>
                             </div>
 
-                            <!-- Status Filter Dropdown -->
-                            <div class="md:col-span-3">
-                                <select id="doc-status-filter"
-                                    class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800">
-                                    <option value="all">สถานะความเร่งด่วนทั้งหมด</option>
-                                    <option value="glow-yellow">🟡 ใกล้ครบกำหนด (ใน 3 วัน)</option>
-                                    <option value="glow-red">🔴 เกินกำหนด (Overdue)</option>
-                                    <option value="glow-green">🟢 รับทราบครบ 100%</option>
-                                    <option value="glow-none">⚪ ปกติ</option>
-                                </select>
-                            </div>
+                            <!-- Row 2: Filter Selectors (Official Doc Type, Target Scope, Target User, Priority, Status) -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
 
-                            <!-- Priority Filter Dropdown -->
-                            <div class="md:col-span-3">
-                                <select id="doc-priority-filter"
-                                    class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold">
-                                    <option value="all">ความสำคัญทั้งหมด</option>
-                                    <option value="ปกติ">🟢 ปกติ</option>
-                                    <option value="ด่วน">🟠 ด่วน</option>
-                                    <option value="ด่วนที่สุด">🔴 ด่วนที่สุด</option>
-                                </select>
+                                <!-- Filter 1: ประเภทหนังสือราชการ (Official Document Type) -->
+                                <div class="lg:col-span-3">
+                                    <label for="doc-type-filter" class="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-tags text-hqd-600"></i>
+                                        <span>ประเภทหนังสือราชการ</span>
+                                    </label>
+                                    <select id="doc-type-filter"
+                                        class="w-full px-4 py-3 text-base sm:text-lg rounded-2xl border-2 border-slate-200 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold cursor-pointer">
+                                        <option value="all">📂 ประเภทหนังสือทั้งหมด</option>
+                                        <option value="คำสั่ง">📋 คำสั่ง</option>
+                                        <option value="ประกาศ">📢 ประกาศ</option>
+                                        <option value="หนังสือเวียน">📑 หนังสือเวียน</option>
+                                        <option value="บันทึกข้อความ">📝 บันทึกข้อความ</option>
+                                        <option value="ระเบียบ/ข้อบังคับ">⚖️ ระเบียบ / ข้อบังคับ</option>
+                                        <option value="หนังสือทั่วไป">📁 หนังสือราชการทั่วไป</option>
+                                    </select>
+                                </div>
+
+                                <!-- Filter 2: กลุ่มเป้าหมายผู้รับ (Target Scope: ทุกคน vs รายบุคคล) -->
+                                <div id="admin-target-filter-group" class="lg:col-span-3">
+                                    <label for="doc-target-filter" class="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-users-rays text-purple-600"></i>
+                                        <span>กลุ่มเป้าหมายผู้รับ</span>
+                                        <span id="admin-target-filter-badge" class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold border border-purple-200 hidden sm:inline-block">แอดมิน</span>
+                                    </label>
+                                    <select id="doc-target-filter"
+                                        class="w-full px-4 py-3 text-base sm:text-lg rounded-2xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold cursor-pointer">
+                                        <option value="all">🌐 กลุ่มเป้าหมายทั้งหมด</option>
+                                        <option value="everyone">📢 ส่งทุกคนในองค์กร (All Staff)</option>
+                                        <option value="specific">👤 ส่งรายบุคคล (Specific Personnel)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Filter 3: กรองเลือกบุคลากรรายบุคคล (Individual Personnel Selector) -->
+                                <div id="doc-target-user-filter-wrapper" class="lg:col-span-3 hidden">
+                                    <label for="doc-target-user-filter" class="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-user-check text-blue-600"></i>
+                                        <span>กรองระบุรายบุคคล</span>
+                                    </label>
+                                    <select id="doc-target-user-filter"
+                                        class="w-full px-4 py-3 text-base sm:text-lg rounded-2xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold cursor-pointer">
+                                        <option value="all">👥 บุคลากรเป้าหมายทุกคน</option>
+                                        <!-- Populated dynamically with personnel -->
+                                    </select>
+                                </div>
+
+                                <!-- Filter 4: ระดับความสำคัญ (Priority) & สถานะ (Status) -->
+                                <div class="lg:col-span-3 grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label for="doc-priority-filter" class="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+                                            <i class="fa-solid fa-flag text-rose-500"></i>
+                                            <span>ความสำคัญ</span>
+                                        </label>
+                                        <select id="doc-priority-filter"
+                                            class="w-full px-3 py-3 text-base rounded-2xl border-2 border-slate-200 focus:border-hqd-500 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold cursor-pointer">
+                                            <option value="all">ทั้งหมด</option>
+                                            <option value="ปกติ">🟢 ปกติ</option>
+                                            <option value="ด่วน">🟠 ด่วน</option>
+                                            <option value="ด่วนที่สุด">🔴 ด่วนที่สุด</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="doc-status-filter" class="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+                                            <i class="fa-solid fa-clock text-amber-500"></i>
+                                            <span>สถานะ</span>
+                                        </label>
+                                        <select id="doc-status-filter"
+                                            class="w-full px-3 py-3 text-base rounded-2xl border-2 border-slate-200 focus:border-hqd-500 outline-none transition bg-slate-50 focus:bg-white text-slate-800 font-semibold cursor-pointer">
+                                            <option value="all">ทั้งหมด</option>
+                                            <option value="glow-yellow">🟡 ใน 3 วัน</option>
+                                            <option value="glow-red">🔴 เกินกำหนด</option>
+                                            <option value="glow-green">🟢 ครบ 100%</option>
+                                            <option value="glow-none">⚪ ปกติ</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                             </div>
 
                         </div>
@@ -481,12 +571,20 @@
                                 </p>
                             </div>
 
-                            <!-- Add Personnel Button -->
-                            <button type="button" id="open-add-user-modal-btn"
-                                class="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer">
-                                <i class="fa-solid fa-user-plus"></i>
-                                <span>เพิ่มบุคลากรใหม่</span>
-                            </button>
+                            <!-- Action Buttons (Export Report & Add Personnel) -->
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button type="button" id="export-report-csv-btn"
+                                    class="px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-lg font-bold rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                                    title="ส่งออกรายงานสถานะการรับทราบเป็นไฟล์ Excel CSV">
+                                    <i class="fa-solid fa-file-excel text-emerald-600 text-xl"></i>
+                                    <span>ส่งออกรายงาน CSV</span>
+                                </button>
+                                <button type="button" id="open-add-user-modal-btn"
+                                    class="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                    <span>เพิ่มบุคลากรใหม่</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Search & Filters -->
@@ -601,14 +699,30 @@
 
                 <form id="create-doc-form" class="space-y-6">
 
-                    <!-- Document Title -->
-                    <div>
-                        <label for="doc-form-title" class="block font-bold text-slate-800 mb-2">
-                            ชื่อเรื่องเอกสาร <span class="text-rose-500">*</span>
-                        </label>
-                        <input type="text" id="doc-form-title" required
-                            placeholder="เช่น ประกาศแนวทางการปฏิบัติงานประจำปี 2569"
-                            class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition" />
+                    <!-- Document Title & Official Type -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                        <div class="md:col-span-8">
+                            <label for="doc-form-title" class="block font-bold text-slate-800 mb-2">
+                                ชื่อเรื่องเอกสาร <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="text" id="doc-form-title" required
+                                placeholder="เช่น ประกาศแนวทางการปฏิบัติงานประจำปี 2569"
+                                class="w-full px-5 py-4 text-xl rounded-2xl border-2 border-slate-300 focus:border-hqd-500 focus:ring-4 focus:ring-hqd-100 outline-none transition" />
+                        </div>
+                        <div class="md:col-span-4">
+                            <label for="doc-form-type" class="block font-bold text-slate-800 mb-2">
+                                ประเภทหนังสือราชการ <span class="text-rose-500">*</span>
+                            </label>
+                            <select id="doc-form-type" required
+                                class="w-full px-4 py-4 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none bg-white transition font-semibold cursor-pointer">
+                                <option value="ประกาศ" selected>📢 ประกาศ (Announcement)</option>
+                                <option value="คำสั่ง">📋 คำสั่ง (Order)</option>
+                                <option value="หนังสือเวียน">📑 หนังสือเวียน (Circular Notice)</option>
+                                <option value="บันทึกข้อความ">📝 บันทึกข้อความ (Memorandum)</option>
+                                <option value="ระเบียบ/ข้อบังคับ">⚖️ ระเบียบ / ข้อบังคับ</option>
+                                <option value="หนังสือทั่วไป">📁 หนังสือราชการทั่วไป</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Priority & Dates Row -->
@@ -703,7 +817,7 @@
                                 class="inline-flex items-center gap-3 cursor-pointer p-3 rounded-2xl hover:bg-white border-2 border-transparent hover:border-slate-300 transition">
                                 <input type="radio" name="targetType" value="all" checked
                                     class="w-6 h-6 text-hqd-600 focus:ring-hqd-500" />
-                                <span class="font-semibold text-slate-800">ส่งทุกคนในองค์กร (All Staff)</span>
+                                <span class="font-semibold text-slate-800">ส่งทุกคนในองค์กร (All Staff) <span id="target-all-hint" class="text-sm font-normal text-slate-500"></span></span>
                             </label>
 
                             <label
@@ -737,6 +851,17 @@
                                 </div>
                             </div>
 
+                            <!-- Quick Department Selection Chips -->
+                            <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-2">
+                                <label class="block text-sm font-bold text-slate-700">
+                                    <i class="fa-solid fa-layer-group text-hqd-600 mr-1.5"></i>
+                                    เลือกด่วนตามแผนก (คลิกเพื่อเลือกหรือยกเลิกทั้งแผนก):
+                                </label>
+                                <div id="target-dept-chips" class="flex flex-wrap gap-2 pt-1">
+                                    <!-- Populated dynamically by app.js renderTargetDeptChips -->
+                                </div>
+                            </div>
+
                             <!-- Quick search in modal -->
                             <input type="text" id="modal-user-search-input"
                                 placeholder="พิมพ์ค้นหาชื่อ หรือแผนกในรายการนี้..."
@@ -753,6 +878,11 @@
 
                         </div>
 
+                    </div>
+
+                    <!-- Upload / Save Progress Bar -->
+                    <div id="create-doc-progress" class="hidden w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                        <div class="bg-hqd-600 h-full w-full animate-pulse"></div>
                     </div>
 
                 </form>
@@ -879,12 +1009,19 @@
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 sm:px-8 py-4 border-t-2 border-slate-100 bg-slate-50 flex items-center justify-between">
-                <button type="button" id="copy-unread-btn"
-                    class="px-4 py-2.5 text-base font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition flex items-center gap-2">
-                    <i class="fa-solid fa-copy"></i>
-                    <span>คัดลอกรายชื่อผู้ยังไม่อ่าน</span>
-                </button>
+            <div class="px-6 sm:px-8 py-4 border-t-2 border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" id="copy-unread-btn"
+                        class="px-4 py-2.5 text-base font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition flex items-center gap-2">
+                        <i class="fa-solid fa-copy"></i>
+                        <span>คัดลอกรายชื่อผู้ยังไม่อ่าน</span>
+                    </button>
+                    <button type="button" id="export-tracking-csv-btn"
+                        class="px-4 py-2.5 text-base font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                        <span>ส่งออก CSV</span>
+                    </button>
+                </div>
                 <button type="button"
                     class="modal-close-btn px-6 py-2.5 text-lg font-bold text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-xl transition"
                     data-modal="modal-tracking">
@@ -937,8 +1074,9 @@
                     <label for="user-form-dept" class="block font-bold text-slate-800 mb-2">
                         แผนก / ตำแหน่ง <span class="text-rose-500">*</span>
                     </label>
-                    <input type="text" id="user-form-dept" required placeholder="เช่น พยาบาล, นักวิชาการพัฒนาคุณภาพ"
+                    <input type="text" id="user-form-dept" list="dept-suggestions" required placeholder="เช่น พยาบาล, นักวิชาการพัฒนาคุณภาพ"
                         class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                    <datalist id="dept-suggestions"></datalist>
                 </div>
 
                 <div>
@@ -1013,6 +1151,11 @@
 
             <!-- Viewer Body (Iframe or Image preview) -->
             <div class="flex-1 bg-slate-100 p-2 sm:p-4 flex items-center justify-center overflow-hidden relative">
+                <div id="viewer-loading"
+                    class="hidden absolute z-20 flex flex-col items-center justify-center p-8 bg-white/95 backdrop-blur-sm rounded-3xl border-2 border-slate-200 shadow-xl">
+                    <i class="fa-solid fa-spinner fa-spin text-5xl text-hqd-600 mb-3"></i>
+                    <p class="text-xl font-bold text-slate-800">กำลังโหลดเอกสาร...</p>
+                </div>
                 <iframe id="viewer-frame"
                     class="w-full h-full rounded-2xl border border-slate-300 bg-white shadow-inner"
                     src="about:blank"></iframe>
@@ -1058,6 +1201,106 @@
 
             </div>
 
+        </div>
+    </div>
+
+
+    <!-- E. CHANGE PIN MODAL (ALL USERS) -->
+    <div id="modal-change-pin"
+        class="modal-overlay hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+        role="dialog" aria-modal="true" aria-labelledby="modal-change-pin-title">
+        <div
+            class="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 w-full max-w-md overflow-hidden animate-scale-up">
+
+            <!-- Modal Header -->
+            <div class="px-6 py-5 border-b-2 border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-hqd-600 text-white flex items-center justify-center text-2xl shadow">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                    <div>
+                        <h3 id="modal-change-pin-title" class="text-2xl font-bold text-slate-900">เปลี่ยนรหัสผ่าน / PIN</h3>
+                        <p class="text-slate-500 text-sm">กำหนดรหัสผ่านใหม่เพื่อความปลอดภัย</p>
+                    </div>
+                </div>
+                <button type="button"
+                    class="modal-close-btn p-2 text-slate-400 hover:text-slate-700 text-2xl rounded-xl transition"
+                    data-modal="modal-change-pin" aria-label="ปิดหน้าต่าง">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Form -->
+            <form id="change-pin-form" class="p-6 sm:p-8 space-y-5 text-lg">
+                <div>
+                    <label for="pin-current" class="block font-bold text-slate-800 mb-2">
+                        รหัสผ่าน / PIN ปัจจุบัน <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="password" id="pin-current" required placeholder="กรอก PIN เดิม"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <div>
+                    <label for="pin-new" class="block font-bold text-slate-800 mb-2">
+                        รหัสผ่าน / PIN ใหม่ (ตัวเลข 4–8 หลัก) <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="password" id="pin-new" required placeholder="กรอกตัวเลข 4-8 หลัก" pattern="\d{4,8}"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <div>
+                    <label for="pin-confirm" class="block font-bold text-slate-800 mb-2">
+                        ยืนยันรหัสผ่าน / PIN ใหม่ <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="password" id="pin-confirm" required placeholder="กรอก PIN ใหม่อีกครั้ง" pattern="\d{4,8}"
+                        class="w-full px-4 py-3.5 text-lg rounded-2xl border-2 border-slate-300 focus:border-hqd-500 outline-none" />
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                    <button type="button"
+                        class="modal-close-btn px-6 py-3 text-lg font-bold text-slate-600 hover:bg-slate-200 rounded-2xl transition"
+                        data-modal="modal-change-pin">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" id="change-pin-submit-btn"
+                        class="px-8 py-3 text-xl font-bold text-white bg-hqd-600 hover:bg-hqd-700 rounded-2xl shadow-lg transition flex items-center gap-2 cursor-pointer">
+                        <span>บันทึก PIN ใหม่</span>
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- F. ELDER-FRIENDLY CONFIRM MODAL -->
+    <div id="modal-confirm"
+        class="modal-overlay hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+        role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div
+            class="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up p-6 sm:p-8 space-y-6">
+            <div class="flex items-start gap-4">
+                <div id="confirm-icon"
+                    class="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-2xl flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 id="confirm-title" class="text-2xl font-bold text-slate-900">ยืนยันการทำรายการ</h3>
+                    <p id="confirm-message" class="text-slate-600 text-lg mt-2 whitespace-pre-line leading-relaxed"></p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" id="confirm-cancel-btn"
+                    class="px-6 py-3.5 text-lg font-bold text-slate-600 hover:bg-slate-200 rounded-2xl transition cursor-pointer">
+                    ยกเลิก
+                </button>
+                <button type="button" id="confirm-ok-btn"
+                    class="px-6 py-3.5 text-xl font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-2xl shadow-lg transition cursor-pointer">
+                    ยืนยัน
+                </button>
+            </div>
         </div>
     </div>
 
