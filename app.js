@@ -2484,7 +2484,10 @@
       renderCurrentTab();
 
       const isNet = err.network || !navigator.onLine || /เครือข่าย|เชื่อมต่อ|Network|Failed to fetch|AbortError|timeout/i.test(err.message || '');
-      if (isNet) {
+      const isDriveAuth = /DriveApp|Access denied/i.test(err.message || '');
+      if (isDriveAuth) {
+        showToast(`บันทึกเอกสาร "${title}" ลงในเครื่องแล้ว — Google Drive ยังไม่ได้รับสิทธิ์ (เปิด Apps Script แล้วกด Run "authorizeDrive")`, 'warning', 12000);
+      } else if (isNet) {
         showToast(`บันทึกเอกสาร "${title}" (${localDocId}) ลงในเครื่องเรียบร้อยแล้ว (จะซิงค์ขึ้นเซิร์ฟเวอร์อัตโนมัติเมื่อออนไลน์)`, 'info', 8000);
       } else {
         showToast(`บันทึกเอกสาร "${title}" (${localDocId}) ลงในเครื่องแล้ว (เซิร์ฟเวอร์ตอบกลับ: ${err.message || 'รอดำเนินการ'})`, 'warning', 10000);
