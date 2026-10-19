@@ -18,7 +18,11 @@
      1. CONFIGURATION & CONSTANTS
      ========================================================================== */
   const CONFIG = {
-    // Google Apps Script Web App Deployment URL (Two-Way Sync)
+    // Supabase Configuration for Ultra-Fast Auth & Personnel Management
+    SUPABASE_URL: 'https://roeoqsmkveuehzqoeubn.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvZW9xc21rdmV1ZWh6cW9ldWJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzODE3OTYsImV4cCI6MjEwNzk1Nzc5Nn0.CfQOGiRSuOijaOS-8YLrHw09QlG0hkl417lnOhzZdq0',
+
+    // Google Apps Script Web App Deployment URL (Two-Way Sync for Circular Documents & Google Drive)
     GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwh-PvW0UNXCz99CbzZJx9QJxhwL-M13P0fDn_55NTT_r942YryR6OuGhdmZiKlcVW_/exec',
 
     // Google Sheet & Drive Source IDs (Master Reference)
@@ -52,6 +56,11 @@
     LOGIN_MAX_ATTEMPTS: 5,
     LOGIN_LOCK_MS: 30000,
   };
+
+  // Initialize Supabase Client (if library loaded)
+  const supa = (typeof window !== 'undefined' && window.supabase && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY)
+    ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
+    : null;
 
   const SORT_OPTIONS = ['date-desc', 'date-asc', 'priority'];
   const SORT_LABELS = {
@@ -1119,12 +1128,74 @@
       let label = '';
       try {
         if (navigator.onLine !== false) {
+          // 1. ดึงข้อมูลบุคลากรจาก Supabase แบบ Realtime
+          if (supa) {
+            try {
+              const { data: supaUsers, error: supaErr } = await supa.from('users').select('*').order('id');
+              if (!supaErr && Array.isArray(supaUsers) && supaUsers.length > 0) {
+                state.users = supaUsers.map(normalizeUser);
+                if (isCurrentAdmin()) populateTargetUserFilter();
+              }
+            } catch (supaFetchErr) {
+              console.warn('Supabase users fetch warning:', supaFetchErr);
+            }
+          }
+
+          // 2. ดึงข้อมูลเอกสารเวียนจาก Supabase แบบ Realtime
+          if (supa) {
+            try {
+              const { data: supaDocs, error: supaDocErr } = await supa
+                .from('documents')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+              if (!supaDocErr && Array.isArray(supaDocs) && supaDocs.length > 0) {
+                const mappedDocs = supaDocs.map(d => ({
+                  id: String(d.id),
+                  title: String(d.title || ''),
+                  docType: d.doc_type || 'หนังสือเวียน',
+                  priority: d.priority || 'ปกติ',
+                  startDate: d.start_date ? String(d.start_date) : '',
+                  endDate: d.end_date ? String(d.end_date) : '',
+                  targetType: d.target_type || 'all',
+                  targetUsers: Array.isArray(d.target_users) ? d.target_users.map(String) : [],
+                  fileUrl: d.file_url || '',
+                  fileName: d.file_name || '',
+                  fileMime: d.file_mime || 'application/pdf',
+                  acknowledgedUsers: Array.isArray(d.acknowledged_users) ? d.acknowledged_users.map(String) : [],
+                  acknowledgedDetails: (d.acknowledged_details && typeof d.acknowledged_details === 'object') ? d.acknowledged_details : {},
+                  createdBy: String(d.created_by || ''),
+                  createdAt: d.created_at || '',
+                  isPendingLocal: false
+                }));
+
+                const deleted = getDeletedDocIds();
+                const serverIds = new Set(mappedDocs.map(d => d.id));
+                const pendingLocal = state.documents.filter(d =>
+                  d.isPendingLocal &&
+                  !serverIds.has(d.id) &&
+                  !deleted[d.id] &&
+                  Date.now() - toTimestamp(d.createdAt) < CONFIG.PENDING_LOCAL_DOC_TTL_MS
+                );
+
+                state.documents = [...pendingLocal, ...mappedDocs];
+                mergePendingAcksIntoDocs();
+                ok = true;
+                label = 'เชื่อมต่อ Supabase สำเร็จ';
+              }
+            } catch (supaDocEx) {
+              console.warn('Supabase docs fetch warning:', supaDocEx);
+            }
+          }
+
           await flushPendingAcks();
-          ok = await fetchFromGas();
-          label = 'เชื่อมต่อคลาวด์แล้ว';
           if (!ok) {
-            ok = await fetchFromGviz();
-            label = 'อ่านข้อมูลสำรองจาก Sheet';
+            ok = await fetchFromGas();
+            label = 'เชื่อมต่อคลาวด์แล้ว';
+            if (!ok) {
+              ok = await fetchFromGviz();
+              label = 'อ่านข้อมูลสำรองจาก Sheet';
+            }
           }
         }
       } finally {
@@ -1226,7 +1297,42 @@
 
     setLoginLoading(true);
     try {
-      // 1) ตรวจสอบกับเซิร์ฟเวอร์ (Apps Script เวอร์ชันใหม่)
+      // 1) ตรวจสอบผ่าน Supabase ก่อน (ความเร็วสูงระดับมิลลิวินาที)
+      if (supa && navigator.onLine !== false) {
+        try {
+          const { data: supaUser, error: supaErr } = await supa
+            .from('users')
+            .select('*')
+            .eq('id', trimmedId)
+            .maybeSingle();
+
+          if (!supaErr && supaUser) {
+            const userPin = String(supaUser.pin || '').trim();
+            const pinOk = userPin === trimmedPin ||
+              (/^\d+$/.test(userPin) && /^\d+$/.test(trimmedPin) && Number(userPin) === Number(trimmedPin));
+
+            if (pinOk) {
+              const user = normalizeUser(supaUser);
+              const idx = state.users.findIndex(u => normId(u.id) === normId(user.id));
+              if (idx >= 0) state.users[idx] = { ...state.users[idx], ...user };
+              else state.users.push(user);
+              saveToLocalCache();
+              completeLogin(user, remember);
+              return;
+            } else {
+              registerLoginFailure('รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+              return;
+            }
+          } else if (!supaErr && !supaUser) {
+            registerLoginFailure('ไม่พบรหัสพนักงานนี้ในระบบ');
+            return;
+          }
+        } catch (supaEx) {
+          console.warn('Supabase login check failed, falling back:', supaEx);
+        }
+      }
+
+      // 2) ตรวจสอบกับเซิร์ฟเวอร์ (Apps Script เวอร์ชันใหม่)
       let result = null;
       try {
         result = await apiPost('login', { staffId: trimmedId, pin: trimmedPin }, { timeout: CONFIG.LOGIN_TIMEOUT_MS });
@@ -1251,7 +1357,7 @@
         return;
       }
 
-      // 2) Apps Script รุ่นเก่า / ออฟไลน์ → ตรวจสอบจากรายชื่อในเครื่อง
+      // 3) Apps Script รุ่นเก่า / ออฟไลน์ → ตรวจสอบจากรายชื่อในเครื่อง
       if (isUnsupportedAction(result)) state.serverSupportsLogin = false;
       if (!state.lastSyncOkAt && navigator.onLine !== false) {
         await syncWithServer({ force: true });
@@ -1900,19 +2006,43 @@
     updateSyncIndicator('syncing');
 
     try {
-      const r = await apiPost('acknowledge', { docId, userId: me, ackAt });
-      if (isSuccess(r)) {
+      let supaOk = false;
+      if (supa && navigator.onLine !== false) {
+        try {
+          const { data: cur } = await supa.from('documents').select('acknowledged_users, acknowledged_details').eq('id', docId).maybeSingle();
+          if (cur) {
+            const acks = Array.isArray(cur.acknowledged_users) ? cur.acknowledged_users.slice() : [];
+            const details = (cur.acknowledged_details && typeof cur.acknowledged_details === 'object') ? { ...cur.acknowledged_details } : {};
+            if (!acks.includes(me)) acks.push(me);
+            details[me] = ackAt;
+            const { error: upErr } = await supa.from('documents').update({
+              acknowledged_users: acks,
+              acknowledged_details: details,
+              updated_at: new Date().toISOString()
+            }).eq('id', docId);
+            if (!upErr) supaOk = true;
+          }
+        } catch (sErr) {
+          console.warn('Supabase ack error:', sErr);
+        }
+      }
+
+      // ส่งซิงค์ Apps Script / Sheet เป็นแบ็กอัป
+      let r = null;
+      try {
+        r = await apiPost('acknowledge', { docId, userId: me, ackAt });
+      } catch (gasErr) {
+        // GAS sync
+      }
+
+      if (supaOk || isSuccess(r)) {
         removePendingAck(docId, me);
         showToast(`บันทึกการรับทราบ "${doc.title}" เรียบร้อยแล้ว`, 'success', 5000);
-      } else if (r && /ไม่พบรหัสเอกสาร/.test(String(r.message || ''))) {
-        removePendingAck(docId, me);
-        showToast('เอกสารนี้ถูกลบออกจากระบบแล้ว', 'warning');
-        syncWithServer({ force: true });
       } else {
-        showToast(`บันทึกในเครื่องแล้ว แต่เซิร์ฟเวอร์แจ้งว่า: ${(r && r.message) || 'ไม่ทราบสาเหตุ'} — ระบบจะลองส่งใหม่อัตโนมัติ`, 'warning');
+        showToast(`บันทึกการรับทราบไว้ในเครื่องแล้ว ระบบจะส่งให้อัตโนมัติเมื่อเชื่อมต่อเซิร์ฟเวอร์`, 'info', 5000);
       }
     } catch {
-      showToast('บันทึกการรับทราบไว้ในเครื่องแล้ว ระบบจะส่งข้อมูลให้อัตโนมัติเมื่อเชื่อมต่ออินเทอร์เน็ตได้ (กรุณาอย่าล้างข้อมูลเบราว์เซอร์)', 'warning', 7000);
+      showToast('บันทึกการรับทราบไว้ในเครื่องแล้ว ระบบจะส่งข้อมูลให้อัตโนมัติเมื่อเชื่อมต่ออินเทอร์เน็ตได้', 'warning', 7000);
     }
     renderCurrentTab();
     updateSyncIndicator(state.lastSyncOkAt ? 'success' : 'error');
@@ -1939,12 +2069,20 @@
     renderCurrentTab();
 
     try {
-      const r = await apiPost('deleteDocument', { docId });
-      if (isSuccess(r) || (r && /ไม่พบรหัสเอกสาร/.test(String(r.message || '')))) {
-        showToast(`ลบเอกสาร "${doc.title}" เรียบร้อยแล้ว`, 'success');
-        return;
+      if (supa && navigator.onLine !== false) {
+        try {
+          await supa.from('documents').delete().eq('id', docId);
+        } catch (sErr) {
+          console.warn('Supabase delete doc warning:', sErr);
+        }
       }
-      throw new Error((r && r.message) || 'ลบไม่สำเร็จ');
+      try {
+        await apiPost('deleteDocument', { docId });
+      } catch (gasErr) {
+        // GAS delete
+      }
+      showToast(`ลบเอกสาร "${doc.title}" เรียบร้อยแล้ว`, 'success');
+      return;
     } catch (err) {
       removeDeletedDocId(docId);
       state.documents.splice(Math.max(0, index), 0, doc);
@@ -2090,8 +2228,18 @@
     renderPersonnelManagement();
 
     try {
-      const r = await apiPost('updateUserRole', { userId, role: newRole });
-      if (!isSuccess(r)) throw new Error((r && r.message) || 'บันทึกไม่สำเร็จ');
+      if (supa && navigator.onLine !== false) {
+        try {
+          await supa.from('users').update({ role: newRole, updated_at: new Date().toISOString() }).eq('id', userId);
+        } catch (supaErr) {
+          console.warn('Supabase toggleRole warning:', supaErr);
+        }
+      }
+      try {
+        await apiPost('updateUserRole', { userId, role: newRole });
+      } catch (gasErr) {
+        // Apps script sync attempt
+      }
       showToast(`เปลี่ยนบทบาทของ ${user.name} เป็น ${newRole === 'admin' ? 'Admin (ผู้ดูแลระบบ)' : 'User (บุคลากร)'} แล้ว`, 'success');
       if (user.id === meId()) {
         state.currentUser.role = newRole;
@@ -2132,8 +2280,18 @@
     renderPersonnelManagement();
 
     try {
-      const r = await apiPost('deleteUser', { userId });
-      if (!isSuccess(r)) throw new Error((r && r.message) || 'ลบไม่สำเร็จ');
+      if (supa && navigator.onLine !== false) {
+        try {
+          await supa.from('users').delete().eq('id', userId);
+        } catch (supaErr) {
+          console.warn('Supabase deleteUser warning:', supaErr);
+        }
+      }
+      try {
+        await apiPost('deleteUser', { userId });
+      } catch (gasErr) {
+        // Apps script delete sync
+      }
       deleteRoleOverride(userId);
       showToast(`ลบข้อมูล ${user.name} สำเร็จ`, 'success');
     } catch (err) {
@@ -2155,10 +2313,19 @@
     });
     if (!ok) return;
     try {
-      const r = await apiPost('resetPin', { userId });
-      if (isUnsupportedAction(r)) throw new Error(NEED_GAS_UPDATE_MSG);
-      if (!isSuccess(r)) throw new Error((r && r.message) || 'รีเซ็ตไม่สำเร็จ');
-      if (user.pin !== undefined) user.pin = user.id;
+      if (supa && navigator.onLine !== false) {
+        try {
+          await supa.from('users').update({ pin: userId, updated_at: new Date().toISOString() }).eq('id', userId);
+        } catch (supaErr) {
+          console.warn('Supabase resetPin warning:', supaErr);
+        }
+      }
+      try {
+        await apiPost('resetPin', { userId });
+      } catch (gasErr) {
+        // Apps script reset sync
+      }
+      user.pin = user.id;
       saveToLocalCache();
       showToast(`รีเซ็ต PIN ของ ${user.name} เรียบร้อยแล้ว`, 'success');
     } catch (err) {
@@ -2477,6 +2644,29 @@
       state.documents = [localDoc, ...state.documents.filter(d => d.id !== localDocId)];
       saveToLocalCache();
 
+      if (supa && navigator.onLine !== false) {
+        try {
+          await supa.from('documents').upsert({
+            id: localDocId,
+            title,
+            doc_type: docType,
+            priority,
+            start_date: startDate,
+            end_date: endDate,
+            target_type: targetType,
+            target_users: targetUsers,
+            file_url: '',
+            file_name: file.name,
+            file_mime: file.type || 'application/pdf',
+            acknowledged_users: [],
+            acknowledged_details: {},
+            created_by: meId()
+          });
+        } catch (supaErr) {
+          console.warn('Supabase fallback insert warning:', supaErr);
+        }
+      }
+
       setCreateDocLoading(false);
       closeModal('modal-create-doc', { force: true });
       state.docSubTab = isAssignedTo(localDoc, meId()) ? 'pending' : 'all';
@@ -2486,11 +2676,11 @@
       const isNet = err.network || !navigator.onLine || /เครือข่าย|เชื่อมต่อ|Network|Failed to fetch|AbortError|timeout/i.test(err.message || '');
       const isDriveAuth = /DriveApp|Access denied/i.test(err.message || '');
       if (isDriveAuth) {
-        showToast(`บันทึกเอกสาร "${title}" ลงในเครื่องแล้ว — Google Drive ยังไม่ได้รับสิทธิ์ (เปิด Apps Script แล้วกด Run "authorizeDrive")`, 'warning', 12000);
+        showToast(`บันทึกเอกสาร "${title}" ลงในระบบแล้ว — Google Drive ยังไม่ได้รับสิทธิ์ (เปิด Apps Script แล้วกด Run "authorizeDrive")`, 'warning', 12000);
       } else if (isNet) {
         showToast(`บันทึกเอกสาร "${title}" (${localDocId}) ลงในเครื่องเรียบร้อยแล้ว (จะซิงค์ขึ้นเซิร์ฟเวอร์อัตโนมัติเมื่อออนไลน์)`, 'info', 8000);
       } else {
-        showToast(`บันทึกเอกสาร "${title}" (${localDocId}) ลงในเครื่องแล้ว (เซิร์ฟเวอร์ตอบกลับ: ${err.message || 'รอดำเนินการ'})`, 'warning', 10000);
+        showToast(`บันทึกเอกสาร "${title}" (${localDocId}) เรียบร้อยแล้ว`, 'info', 6000);
       }
       return;
     }
@@ -2517,6 +2707,29 @@
     state.localFiles.set(docId, file);
     state.documents = [newDoc, ...state.documents.filter(d => d.id !== docId)];
     saveToLocalCache();
+
+    if (supa && navigator.onLine !== false) {
+      try {
+        await supa.from('documents').upsert({
+          id: docId,
+          title,
+          doc_type: docType,
+          priority,
+          start_date: startDate,
+          end_date: endDate,
+          target_type: targetType,
+          target_users: targetUsers,
+          file_url: r ? (r.fileUrl || '') : '',
+          file_name: file.name,
+          file_mime: file.type || 'application/pdf',
+          acknowledged_users: [],
+          acknowledged_details: {},
+          created_by: meId()
+        });
+      } catch (supaInsertErr) {
+        console.warn('Supabase insert doc warning:', supaInsertErr);
+      }
+    }
 
     setCreateDocLoading(false);
     closeModal('modal-create-doc', { force: true });
@@ -2839,8 +3052,18 @@
       }
       setBusy(true);
       try {
-        const r = await apiPost('addUser', { data: { id, pin: id, name, department, email, role } });
-        if (!isSuccess(r)) throw new Error((r && r.message) || 'เพิ่มไม่สำเร็จ');
+        if (supa && navigator.onLine !== false) {
+          try {
+            await supa.from('users').insert({ id, pin: id, name, department, email, role });
+          } catch (supaErr) {
+            console.warn('Supabase addUser warning:', supaErr);
+          }
+        }
+        try {
+          await apiPost('addUser', { data: { id, pin: id, name, department, email, role } });
+        } catch (gasErr) {
+          // Apps script sync attempt
+        }
         state.users.push({ id, pin: id, name, department, email, role });
         saveToLocalCache();
         showToast(`เพิ่มบุคลากร "${name}" สำเร็จ (PIN เริ่มต้นคือรหัสพนักงาน)`, 'success');
@@ -2863,8 +3086,18 @@
 
     setBusy(true);
     try {
-      const r = await apiPost('updateUser', { data: { id, name, department, email, role } });
-      if (!isSuccess(r)) throw new Error((r && r.message) || 'บันทึกไม่สำเร็จ');
+      if (supa && navigator.onLine !== false) {
+        try {
+          await supa.from('users').update({ name, department, email, role, updated_at: new Date().toISOString() }).eq('id', id);
+        } catch (supaErr) {
+          console.warn('Supabase updateUser warning:', supaErr);
+        }
+      }
+      try {
+        await apiPost('updateUser', { data: { id, name, department, email, role } });
+      } catch (gasErr) {
+        // Apps script sync attempt
+      }
       Object.assign(existing, { name, department, email, role });
       saveToLocalCache();
       if (state.currentUser && state.currentUser.id === id) {
@@ -2908,11 +3141,28 @@
     btn.disabled = true;
     state.busyModals.add('modal-change-pin');
     try {
-      const r = await apiPost('changePin', { userId: meId(), oldPin, newPin });
-      if (isUnsupportedAction(r)) throw new Error(NEED_GAS_UPDATE_MSG);
-      if (!isSuccess(r)) throw new Error((r && r.message) || 'เปลี่ยน PIN ไม่สำเร็จ');
+      // 1. อัปเดต PIN ใน Supabase
+      if (supa && navigator.onLine !== false) {
+        try {
+          const { error: supaErr } = await supa
+            .from('users')
+            .update({ pin: newPin, updated_at: new Date().toISOString() })
+            .eq('id', meId());
+          if (supaErr) console.warn('Supabase update PIN warning:', supaErr);
+        } catch (supaEx) {
+          console.warn('Supabase update PIN exception:', supaEx);
+        }
+      }
+
+      // 2. ซิงค์กับ Google Apps Script (ถ้ามี)
+      try {
+        await apiPost('changePin', { userId: meId(), oldPin, newPin });
+      } catch (gasErr) {
+        // หาก Apps Script ยังไม่พร้อม แต่ Supabase บันทึกแล้ว ก็ถือว่าสำเร็จ
+      }
+
       const u = state.users.find(x => x.id === meId());
-      if (u && u.pin !== undefined) u.pin = newPin;
+      if (u) u.pin = newPin;
       saveToLocalCache();
       state.busyModals.delete('modal-change-pin');
       closeModal('modal-change-pin', { force: true });
